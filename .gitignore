@@ -22,7 +22,7 @@ venv.bak/
 
 # Distribution / packaging
 dist/
-build/
+# build/ is kept — it contains the Axon OS ISO build scripts (not a Python build dir)
 *.egg-info/
 *.egg
 .eggs/
