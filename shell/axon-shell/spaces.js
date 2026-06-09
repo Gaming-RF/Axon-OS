@@ -7,6 +7,20 @@ import Gio from 'gi://Gio';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 
+// ─── Default space definitions ────────────────────────────────────────────────
+
+const DEFAULT_SPACES = [
+    { name: 'Code',     color: '#8b5cf6' },
+    { name: 'Web',      color: '#22d3ee' },
+    { name: 'Chat',     color: '#10b981' },
+    { name: 'Files',    color: '#f59e0b' },
+    { name: 'Media',    color: '#ef4444' },
+    { name: 'Work',     color: '#ec4899' },
+    { name: 'Personal', color: '#06b6d4' },
+    { name: 'Terminal', color: '#84cc16' },
+    { name: 'Notes',    color: '#f97316' },
+];
+
 // ─── SpaceDefinition ──────────────────────────────────────────────────────────
 
 class SpaceDefinition {
@@ -119,7 +133,7 @@ export default class SpacesManager {
                 dir.make_directory_with_parents(null);
             }
         } catch (e) {
-            logError(e, 'AxonShell: could not create ~/.axon directory');
+            console.warn('AxonShell: could not create ~/.axon directory:', e.message);
         }
     }
 
@@ -149,21 +163,19 @@ export default class SpacesManager {
                 this._createDefaultState();
             }
         } catch (e) {
-            logError(e, 'AxonShell: failed to load spaces state');
+            console.warn('AxonShell: failed to load spaces state:', e.message);
             this._createDefaultState();
         }
     }
 
     _createDefaultState() {
-        this._spaces = [
-            new SpaceDefinition({
-                id: GLib.uuid_string_random(),
-                name: 'My Space',
-                color: '#a78bfa',
-                appIds: [],
-                lastActive: null,
-            }),
-        ];
+        this._spaces = DEFAULT_SPACES.map(def => new SpaceDefinition({
+            id: GLib.uuid_string_random(),
+            name: def.name,
+            color: def.color,
+            appIds: [],
+            lastActive: null,
+        }));
         this._currentIndex = 0;
         this._saveState();
     }
@@ -190,7 +202,112 @@ export default class SpacesManager {
                 null
             );
         } catch (e) {
-            logError(e, 'AxonShell: failed to save spaces state');
+            console.warn('AxonShell: failed to save spaces state:', e.message);
+        }
+    }
+
+    // ── OSD overlay ───────────────────────────────────────────────────────────
+
+    _showSpaceOSD(space, idx) {
+        try {
+            const monitor = Main.layoutManager.primaryMonitor;
+            if (!monitor) return;
+
+            const osd = new St.BoxLayout({
+                style_class: 'axon-space-osd',
+                vertical: true,
+                x_align: Clutter.ActorAlign.CENTER,
+                y_align: Clutter.ActorAlign.CENTER,
+                reactive: false,
+                style: [
+                    'background: rgba(17,17,25,0.92);',
+                    'border: 1px solid rgba(139,92,246,0.35);',
+                    'border-radius: 16px;',
+                    'padding: 20px 36px;',
+                    'min-width: 160px;',
+                ].join(' '),
+            });
+
+            const numberLabel = new St.Label({
+                style_class: 'axon-space-osd-number',
+                text: String(idx + 1),
+                x_align: Clutter.ActorAlign.CENTER,
+                style: [
+                    `color: ${space.color};`,
+                    'font-family: "Inter", "Ubuntu", system-ui, sans-serif;',
+                    'font-size: 48px;',
+                    'font-weight: 700;',
+                    'line-height: 1;',
+                ].join(' '),
+            });
+
+            const nameLabel = new St.Label({
+                style_class: 'axon-space-osd-name',
+                text: space.name,
+                x_align: Clutter.ActorAlign.CENTER,
+                style: [
+                    'color: #e8e8f4;',
+                    'font-family: "Inter", "Ubuntu", system-ui, sans-serif;',
+                    'font-size: 18px;',
+                    'font-weight: 600;',
+                    'margin-top: 4px;',
+                ].join(' '),
+            });
+
+            const indexLabel = new St.Label({
+                style_class: 'axon-space-osd-index',
+                text: `Space ${idx + 1} of 9`,
+                x_align: Clutter.ActorAlign.CENTER,
+                style: [
+                    'color: #9090b8;',
+                    'font-family: "Inter", "Ubuntu", system-ui, sans-serif;',
+                    'font-size: 12px;',
+                    'margin-top: 6px;',
+                ].join(' '),
+            });
+
+            osd.add_child(numberLabel);
+            osd.add_child(nameLabel);
+            osd.add_child(indexLabel);
+
+            // Measure after adding children; use a sensible fallback size
+            const osdWidth = 200;
+            const osdHeight = 140;
+
+            osd.set_position(
+                monitor.x + Math.floor((monitor.width - osdWidth) / 2),
+                monitor.y + Math.floor((monitor.height - osdHeight) / 2)
+            );
+
+            osd.set_opacity(0);
+            Main.uiGroup.add_child(osd);
+
+            // Fade in
+            osd.ease({
+                opacity: 255,
+                duration: 200,
+                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+            });
+
+            // After 1500 ms, fade out and destroy
+            GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1500, () => {
+                osd.ease({
+                    opacity: 0,
+                    duration: 300,
+                    mode: Clutter.AnimationMode.EASE_IN_QUAD,
+                    onComplete: () => {
+                        try {
+                            Main.uiGroup.remove_child(osd);
+                            osd.destroy();
+                        } catch (_e) {
+                            // Already destroyed or removed
+                        }
+                    },
+                });
+                return GLib.SOURCE_REMOVE;
+            });
+        } catch (e) {
+            console.warn('AxonShell: _showSpaceOSD error:', e.message);
         }
     }
 
@@ -203,7 +320,6 @@ export default class SpacesManager {
         this._spaces[idx].lastActive = new Date().toISOString();
 
         const workspaceManager = global.workspace_manager;
-        const nWorkspaces = workspaceManager.get_n_workspaces();
 
         // Ensure enough workspaces exist
         while (workspaceManager.get_n_workspaces() <= idx) {
@@ -217,6 +333,7 @@ export default class SpacesManager {
 
         this._updateIndicator();
         this._saveState();
+        this._showSpaceOSD(this._spaces[idx], idx);
     }
 
     createSpace(name, color = '#a78bfa') {
@@ -247,7 +364,7 @@ export default class SpacesManager {
         if (activeIndex >= 0 && activeIndex < this._spaces.length) {
             this._currentIndex = activeIndex;
         } else if (activeIndex >= this._spaces.length) {
-            // Workspace exists but no corresponding space; use last space
+            // Workspace exists but no corresponding space; clamp to last
             this._currentIndex = this._spaces.length - 1;
         }
         this._updateIndicator();

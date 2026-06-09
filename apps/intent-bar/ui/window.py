@@ -1,4 +1,4 @@
-"""Intent Bar main window."""
+"""Intent Bar main window — streaming AI responses with Axon OS design system."""
 
 from __future__ import annotations
 
@@ -12,77 +12,147 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 
-from gi.repository import Adw, GLib, Gtk  # noqa: E402
+from gi.repository import Adw, Gdk, GLib, Gtk, Pango  # noqa: E402
 
 from ..ollama_client import OllamaClient  # noqa: E402
 from ..spaces_manager import SpacesManager  # noqa: E402
 
+# ---------------------------------------------------------------------------
+# Axon OS Design System — embedded CSS
+# ---------------------------------------------------------------------------
+
 _CSS = b"""
+/* ---- Window shell ---- */
 .intent-bar-window {
-    background-color: #17171a;
-    border-radius: 12px;
+    background-color: #09090f;
+    border-radius: 20px;
+    border: 1px solid #3a3a58;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.8);
 }
 
+/* ---- Entry field ---- */
 .intent-entry {
-    background-color: #1e1e22;
-    color: #e8e8f0;
-    border: 1px solid #2e2e38;
-    border-radius: 8px;
-    padding: 10px 14px;
-    font-size: 15px;
-    caret-color: #a78bfa;
+    background-color: transparent;
+    color: #e8e8f4;
+    font-size: 20px;
+    caret-color: #8b5cf6;
+    border: none;
+    padding: 8px 4px;
+    box-shadow: none;
+    outline: none;
 }
 
 .intent-entry:focus {
-    border-color: #a78bfa;
-    box-shadow: 0 0 0 2px rgba(167, 139, 250, 0.25);
+    outline: none;
+    box-shadow: none;
 }
 
+/* ---- Separators ---- */
+.entry-sep {
+    background-color: #2a2a42;
+    min-height: 1px;
+}
+
+/* ---- Quick-action chips ---- */
+.intent-chip {
+    background-color: rgba(139, 92, 246, 0.08);
+    color: #8b5cf6;
+    border: 1px solid rgba(139, 92, 246, 0.35);
+    border-radius: 9999px;
+    padding: 4px 14px;
+    font-size: 12px;
+}
+
+.intent-chip:hover {
+    background-color: #8b5cf6;
+    color: #ffffff;
+}
+
+/* ---- Response text ---- */
 .response-label {
-    color: #c4c4d4;
+    color: #9090b8;
     font-size: 13px;
 }
 
+/* ---- Space badge ---- */
 .space-badge {
-    color: #a78bfa;
+    background-color: rgba(139, 92, 246, 0.15);
+    color: #8b5cf6;
+    border-radius: 9999px;
+    padding: 2px 12px;
     font-size: 11px;
     font-weight: bold;
-    background-color: rgba(167, 139, 250, 0.12);
-    border-radius: 6px;
-    padding: 2px 8px;
 }
 
+/* ---- Model badge ---- */
+.model-badge {
+    background-color: rgba(34, 211, 238, 0.12);
+    color: #22d3ee;
+    border-radius: 9999px;
+    padding: 2px 12px;
+    font-size: 11px;
+}
+
+/* ---- Keyboard hint labels ---- */
+.hint-label {
+    color: #50507a;
+    font-size: 11px;
+}
+
+/* ---- Start Ollama button ---- */
 .start-ollama-btn {
+    color: #8b5cf6;
+    border: 1px solid rgba(139, 92, 246, 0.4);
+    border-radius: 8px;
     background-color: transparent;
-    color: #a78bfa;
-    border: 1px solid #a78bfa;
-    border-radius: 6px;
     font-size: 12px;
     padding: 4px 10px;
 }
 
 .start-ollama-btn:hover {
-    background-color: rgba(167, 139, 250, 0.15);
+    background-color: rgba(139, 92, 246, 0.15);
 }
 """
 
-_SYSTEM_PROMPT_TEMPLATE = """You are an intelligent assistant embedded in Axon OS, a Linux desktop environment.
+# ---------------------------------------------------------------------------
+# System-prompt template
+# ---------------------------------------------------------------------------
+
+_SYSTEM_PROMPT_TEMPLATE = """\
+You are an intelligent assistant embedded in Axon OS, a Linux desktop environment.
 The user is currently in workspace: "{space_name}".
 
 You can perform actions or answer questions.
 
-When the user wants to open an application or run a command, respond ONLY with a JSON object (no markdown, no extra text):
+When the user wants to open an application, respond ONLY with a JSON object (no markdown, no extra text):
   {{"action": "open_app", "app": "<application name>"}}
-  or
+
+When the user wants to run a shell command, respond ONLY with:
   {{"action": "run_command", "command": "<shell command>"}}
 
 For all other queries — information, explanations, conversation — respond with plain natural language text.
 Keep responses concise and helpful.
 """
 
+# Quick-action chip definitions: (label, prefix inserted into entry)
+_CHIPS: list[tuple[str, str]] = [
+    ("Open App", "open "),
+    ("Run Command", "run "),
+    ("Search Web", "search "),
+    ("Summarize", "summarize "),
+    ("Write Code", "write code for "),
+]
+
+_MAX_HISTORY = 20
+
+
+# ---------------------------------------------------------------------------
+# Window
+# ---------------------------------------------------------------------------
+
 
 class IntentBarWindow(Adw.Window):
-    """Floating intent bar window for Axon OS."""
+    """Floating intent bar with streaming AI responses."""
 
     def __init__(
         self,
@@ -93,20 +163,27 @@ class IntentBarWindow(Adw.Window):
         self._ollama = ollama_client
         self._spaces = spaces_manager
 
+        # Command history
+        self._history: list[str] = []
+        self._history_idx: int = -1
+
+        # Accumulator for streaming tokens
+        self._stream_parts: list[str] = []
+
         self.set_decorated(False)
-        self.set_default_size(640, -1)
+        self.set_default_size(660, -1)
         self.set_resizable(False)
         self.add_css_class("intent-bar-window")
 
+        self._apply_css()
         self._build_ui()
         self._connect_signals()
 
     # ------------------------------------------------------------------
-    # UI construction
+    # CSS
     # ------------------------------------------------------------------
 
-    def _build_ui(self) -> None:
-        # Apply CSS
+    def _apply_css(self) -> None:
         provider = Gtk.CssProvider()
         provider.load_from_data(_CSS)
         Gtk.StyleContext.add_provider_for_display(
@@ -115,18 +192,23 @@ class IntentBarWindow(Adw.Window):
             Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
         )
 
-        # Outer box with padding
-        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-        outer.set_margin_top(12)
-        outer.set_margin_bottom(12)
-        outer.set_margin_start(16)
-        outer.set_margin_end(16)
-        self.set_content(outer)
+    # ------------------------------------------------------------------
+    # UI construction
+    # ------------------------------------------------------------------
 
-        # Top row: space badge + start-ollama button
+    def _build_ui(self) -> None:
+        # Root vertical box
+        root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        root.set_margin_top(12)
+        root.set_margin_bottom(12)
+        root.set_margin_start(16)
+        root.set_margin_end(16)
+        self.set_content(root)
+
+        # ---- Row 1: top meta row ----------------------------------------
         top_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        top_row.set_margin_bottom(8)
-        outer.append(top_row)
+        top_row.set_margin_bottom(10)
+        root.append(top_row)
 
         current_space = self._spaces.get_current_space()
         space_name = current_space.name if current_space else "No Space"
@@ -134,42 +216,89 @@ class IntentBarWindow(Adw.Window):
         self._space_badge = Gtk.Label(label=space_name)
         self._space_badge.add_css_class("space-badge")
         self._space_badge.set_halign(Gtk.Align.START)
+        self._space_badge.set_valign(Gtk.Align.CENTER)
         top_row.append(self._space_badge)
 
-        # Spacer
         spacer = Gtk.Box()
         spacer.set_hexpand(True)
         top_row.append(spacer)
 
+        self._model_badge = Gtk.Label(label=self._ollama.model)
+        self._model_badge.add_css_class("model-badge")
+        self._model_badge.set_valign(Gtk.Align.CENTER)
+        top_row.append(self._model_badge)
+
         self._start_ollama_btn = Gtk.Button(label="Start Ollama")
         self._start_ollama_btn.add_css_class("start-ollama-btn")
+        self._start_ollama_btn.set_valign(Gtk.Align.CENTER)
         self._start_ollama_btn.set_visible(not self._ollama.is_available())
         top_row.append(self._start_ollama_btn)
 
-        # Entry row: text field + spinner
-        entry_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        outer.append(entry_row)
+        # ---- Row 2: separator -------------------------------------------
+        sep1 = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        sep1.add_css_class("entry-sep")
+        sep1.set_margin_bottom(4)
+        root.append(sep1)
+
+        # ---- Row 3: entry + spinner -------------------------------------
+        entry_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        entry_row.set_margin_top(4)
+        entry_row.set_margin_bottom(4)
+        root.append(entry_row)
 
         self._entry = Gtk.Entry()
-        self._entry.set_placeholder_text("Ask anything...")
+        self._entry.set_placeholder_text("Ask anything or type a command...")
         self._entry.set_hexpand(True)
         self._entry.add_css_class("intent-entry")
         entry_row.append(self._entry)
 
         self._spinner = Gtk.Spinner()
         self._spinner.set_valign(Gtk.Align.CENTER)
-        self._spinner.set_size_request(24, 24)
+        self._spinner.set_size_request(22, 22)
         entry_row.append(self._spinner)
 
-        # Response label
+        # ---- Row 4: separator -------------------------------------------
+        sep2 = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        sep2.add_css_class("entry-sep")
+        sep2.set_margin_top(4)
+        sep2.set_margin_bottom(8)
+        root.append(sep2)
+
+        # ---- Row 5: quick-action chips ----------------------------------
+        chips_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        chips_row.set_margin_bottom(8)
+        root.append(chips_row)
+
+        for label, prefix in _CHIPS:
+            btn = Gtk.Button(label=label)
+            btn.add_css_class("intent-chip")
+            btn.set_valign(Gtk.Align.CENTER)
+            # Capture `prefix` by default arg
+            btn.connect("clicked", lambda _b, p=prefix: self._on_chip_clicked(p))
+            chips_row.append(btn)
+
+        # ---- Row 6: response label --------------------------------------
         self._response_label = Gtk.Label()
         self._response_label.set_wrap(True)
+        self._response_label.set_wrap_mode(Pango.WrapMode.WORD_CHAR)
         self._response_label.set_xalign(0.0)
         self._response_label.set_selectable(True)
         self._response_label.add_css_class("response-label")
-        self._response_label.set_margin_top(10)
+        self._response_label.set_margin_top(2)
+        self._response_label.set_margin_bottom(8)
         self._response_label.set_visible(False)
-        outer.append(self._response_label)
+        root.append(self._response_label)
+
+        # ---- Row 7: keyboard hint row -----------------------------------
+        hint_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
+        hint_row.set_margin_top(4)
+        root.append(hint_row)
+
+        for hint_text in ("Return  Submit", "Esc  Close", "Up/Down  History"):
+            lbl = Gtk.Label(label=hint_text)
+            lbl.add_css_class("hint-label")
+            lbl.set_valign(Gtk.Align.CENTER)
+            hint_row.append(lbl)
 
     # ------------------------------------------------------------------
     # Signal connections
@@ -179,7 +308,6 @@ class IntentBarWindow(Adw.Window):
         self._entry.connect("activate", self._on_activate)
         self._start_ollama_btn.connect("clicked", self._on_start_ollama)
 
-        # Escape closes the window
         key_ctrl = Gtk.EventControllerKey()
         key_ctrl.connect("key-pressed", self._on_key_pressed)
         self.add_controller(key_ctrl)
@@ -195,15 +323,66 @@ class IntentBarWindow(Adw.Window):
         _keycode: int,
         _state: Any,
     ) -> bool:
-        from gi.repository import Gdk
-
         if keyval == Gdk.KEY_Escape:
             self.close()
             return True
+
+        if keyval == Gdk.KEY_Up:
+            self._history_prev()
+            return True
+
+        if keyval == Gdk.KEY_Down:
+            self._history_next()
+            return True
+
         return False
 
     # ------------------------------------------------------------------
-    # Query handling
+    # History navigation
+    # ------------------------------------------------------------------
+
+    def _history_prev(self) -> None:
+        """Navigate to the previous history entry."""
+        if not self._history:
+            return
+        if self._history_idx < len(self._history) - 1:
+            self._history_idx += 1
+        self._entry.set_text(self._history[self._history_idx])
+        self._entry.set_position(-1)
+
+    def _history_next(self) -> None:
+        """Navigate to the next history entry (or clear if at newest)."""
+        if self._history_idx <= 0:
+            self._history_idx = -1
+            self._entry.set_text("")
+            return
+        self._history_idx -= 1
+        self._entry.set_text(self._history[self._history_idx])
+        self._entry.set_position(-1)
+
+    def _push_history(self, query: str) -> None:
+        """Push a query onto the history stack (dedup head, cap at max)."""
+        if self._history and self._history[0] == query:
+            return
+        self._history.insert(0, query)
+        if len(self._history) > _MAX_HISTORY:
+            self._history = self._history[:_MAX_HISTORY]
+
+    # ------------------------------------------------------------------
+    # Quick-action chips
+    # ------------------------------------------------------------------
+
+    def _on_chip_clicked(self, prefix: str) -> None:
+        """Prepend the chip prefix to the current entry text."""
+        current = self._entry.get_text()
+        if current.startswith(prefix):
+            return
+        self._entry.set_text(prefix + current)
+        self._entry.set_position(-1)
+        self._entry.grab_focus()
+
+    # ------------------------------------------------------------------
+    # Query submission
     # ------------------------------------------------------------------
 
     def _on_activate(self, entry: Gtk.Entry) -> None:
@@ -212,11 +391,17 @@ class IntentBarWindow(Adw.Window):
             return
 
         if not self._ollama.is_available():
-            self._show_response("[error] Ollama is not running. Click 'Start Ollama'.")
+            self._show_error("[error] Ollama is not running. Click 'Start Ollama'.")
             self._start_ollama_btn.set_visible(True)
             return
 
+        # Push to history and reset index
+        self._push_history(query)
+        self._history_idx = -1
+
+        # Prepare UI for streaming
         self._spinner.start()
+        self._response_label.set_text("")
         self._response_label.set_visible(False)
         entry.set_sensitive(False)
 
@@ -227,30 +412,44 @@ class IntentBarWindow(Adw.Window):
         )
         thread.start()
 
-    def _do_query(self, query: str) -> None:
-        """Run the Ollama query in a background thread."""
-        system = self._build_system_prompt()
-        response_text = self._ollama.generate(query, system=system)
-        GLib.idle_add(self._on_response, response_text)
+    # ------------------------------------------------------------------
+    # Streaming implementation
+    # ------------------------------------------------------------------
 
-    def _on_response(self, text: str) -> bool:
-        """Handle the response back on the GTK main thread."""
+    def _do_query(self, query: str) -> None:
+        """Run the Ollama streaming query in a background thread."""
+        system = self._build_system_prompt()
+        self._stream_parts = []
+        try:
+            for token in self._ollama.generate_stream(query, system=system):
+                self._stream_parts.append(token)
+                GLib.idle_add(self._append_token, token)
+        except Exception as exc:
+            GLib.idle_add(self._append_token, f"\n[error] {exc}")
+        GLib.idle_add(self._finish_stream, "".join(self._stream_parts))
+
+    def _append_token(self, token: str) -> bool:
+        """Append a streaming token to the response label (GTK main thread)."""
+        self._response_label.set_text(self._response_label.get_text() + token)
+        self._response_label.set_visible(True)
+        return False
+
+    def _finish_stream(self, full: str) -> bool:
+        """Called when streaming is complete (GTK main thread)."""
         self._spinner.stop()
         self._entry.set_sensitive(True)
+        self._entry.grab_focus()
 
-        # Attempt to parse as an action dict
-        stripped = text.strip()
+        # Attempt action JSON parsing
+        stripped = full.strip()
         try:
-            action: dict[str, Any] = json.loads(stripped)
+            action: Any = json.loads(stripped)
             if isinstance(action, dict) and "action" in action:
                 self._execute_action(action)
-                self._show_response(f"[action] {action}")
-            else:
-                self._show_response(stripped)
         except (json.JSONDecodeError, ValueError):
-            self._show_response(stripped)
+            pass
 
-        return False  # remove from idle queue
+        return False
 
     # ------------------------------------------------------------------
     # Action execution
@@ -292,7 +491,7 @@ class IntentBarWindow(Adw.Window):
     # Helpers
     # ------------------------------------------------------------------
 
-    def _show_response(self, text: str) -> None:
+    def _show_error(self, text: str) -> None:
         self._response_label.set_text(text)
         self._response_label.set_visible(True)
 
@@ -304,4 +503,4 @@ class IntentBarWindow(Adw.Window):
             stderr=subprocess.DEVNULL,
         )
         self._start_ollama_btn.set_sensitive(False)
-        self._show_response("Starting Ollama... please wait a moment and try again.")
+        self._show_error("Starting Ollama... please wait a moment and try again.")
