@@ -1,20 +1,20 @@
 /* ============================================================
-   Axon OS — GTK4 Dark Theme
+   Axon OS — GTK4 Dark Theme (macOS-inspired premium)
    Design tokens
    ============================================================ */
 
-@define-color bg_color          #0e0e10;
-@define-color bg_secondary      #17171a;
-@define-color bg_tertiary       #1e1e23;
-@define-color accent_color      #a78bfa;
-@define-color accent_bg_color   #a78bfa;
-@define-color accent_fg_color   #0e0e10;
-@define-color text_primary      #e0e0e0;
-@define-color text_secondary    #888888;
-@define-color border_color      #2a2a2e;
-@define-color destructive_color #f87171;
-@define-color success_color     #4ade80;
-@define-color warning_color     #fbbf24;
+@define-color bg_color          #0d0d1a;
+@define-color bg_secondary      #111119;
+@define-color bg_tertiary       #1a1a28;
+@define-color accent_color      #8b5cf6;
+@define-color accent_bg_color   #8b5cf6;
+@define-color accent_fg_color   #ffffff;
+@define-color text_primary      #e8e8f4;
+@define-color text_secondary    #7070a0;
+@define-color border_color      #2a2a42;
+@define-color destructive_color #ff5f57;
+@define-color success_color     #28c840;
+@define-color warning_color     #ffbd2e;
 
 /* ============================================================
    Reset / Base
@@ -22,7 +22,6 @@
 
 * {
   -gtk-icon-shadow: none;
-  box-shadow: none;
   text-shadow: none;
 }
 
@@ -34,6 +33,15 @@ window,
 .background {
   background-color: @bg_color;
   color: @text_primary;
+  border-radius: 12px;
+}
+
+window.csd {
+  border-radius: 12px;
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.7),
+    0 4px 16px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 /* ============================================================
@@ -42,41 +50,84 @@ window,
 
 headerbar,
 .titlebar {
-  background-color: @bg_secondary;
+  background: linear-gradient(180deg, #161622 0%, #111119 100%);
   color: @text_primary;
   border-bottom: 1px solid @border_color;
-  box-shadow: none;
-  padding: 4px 8px;
-  min-height: 46px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.3);
+  padding: 6px 12px;
+  min-height: 48px;
+  border-radius: 12px 12px 0 0;
 }
 
 headerbar .title,
 .titlebar .title {
   color: @text_primary;
   font-weight: 600;
+  font-size: 0.92em;
+  letter-spacing: 0.01em;
 }
 
 headerbar .subtitle,
 .titlebar .subtitle {
   color: @text_secondary;
-  font-size: 0.85em;
+  font-size: 0.82em;
 }
 
-/* Window controls */
+/* Traffic light window buttons (macOS-style) */
+headerbar windowcontrols,
+.titlebar windowcontrols {
+  spacing: 6px;
+}
+
 headerbar windowcontrols button,
 .titlebar windowcontrols button {
   background-color: @bg_tertiary;
-  border: 1px solid @border_color;
-  border-radius: 6px;
-  min-width: 16px;
-  min-height: 16px;
-  padding: 2px;
+  border: 1px solid rgba(0, 0, 0, 0.3);
+  border-radius: 9999px;
+  min-width: 12px;
+  min-height: 12px;
+  padding: 0;
   box-shadow: none;
+  transition: background-color 150ms ease, opacity 150ms ease;
+  opacity: 0.85;
 }
 
 headerbar windowcontrols button:hover,
 .titlebar windowcontrols button:hover {
-  background-color: #26262d;
+  opacity: 1.0;
+}
+
+/* Close button — red */
+headerbar windowcontrols button.close,
+.titlebar windowcontrols button.close {
+  background-color: #ff5f57;
+  border-color: #e0443c;
+}
+
+headerbar windowcontrols button.close:hover {
+  background-color: #ff7470;
+}
+
+/* Minimize button — yellow */
+headerbar windowcontrols button.minimize,
+.titlebar windowcontrols button.minimize {
+  background-color: #ffbd2e;
+  border-color: #dfa012;
+}
+
+headerbar windowcontrols button.minimize:hover {
+  background-color: #ffcf5c;
+}
+
+/* Maximize button — green */
+headerbar windowcontrols button.maximize,
+.titlebar windowcontrols button.maximize {
+  background-color: #28c840;
+  border-color: #1dac32;
+}
+
+headerbar windowcontrols button.maximize:hover {
+  background-color: #3ddd56;
 }
 
 /* ============================================================
@@ -88,51 +139,58 @@ button {
   color: @text_primary;
   border: 1px solid @border_color;
   border-radius: 8px;
-  padding: 6px 14px;
-  box-shadow: none;
-  transition: background-color 120ms ease;
+  padding: 7px 16px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
 }
 
 button:hover {
-  background-color: #26262d;
+  background-color: #22222e;
+  border-color: #3a3a58;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }
 
 button:active {
-  background-color: #2e2e36;
+  background-color: #1a1a26;
+  box-shadow: none;
 }
 
 button:disabled {
   background-color: @bg_tertiary;
   color: @text_secondary;
   border-color: @border_color;
-  opacity: 0.5;
+  opacity: 0.45;
+  box-shadow: none;
 }
 
 button.suggested-action {
-  background-color: @accent_color;
-  color: @bg_color;
-  border-color: @accent_color;
+  background: linear-gradient(180deg, #9d6ff8 0%, #8b5cf6 100%);
+  color: #ffffff;
+  border-color: #7c4ef0;
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.35);
 }
 
 button.suggested-action:hover {
-  background-color: #b99ffb;
-  border-color: #b99ffb;
+  background: linear-gradient(180deg, #aa80fa 0%, #9d6ff8 100%);
+  border-color: #8b5cf6;
+  box-shadow: 0 3px 12px rgba(139, 92, 246, 0.45);
 }
 
 button.suggested-action:active {
-  background-color: #9370f6;
-  border-color: #9370f6;
+  background: linear-gradient(180deg, #8b5cf6 0%, #7c4ef0 100%);
+  box-shadow: none;
 }
 
 button.destructive-action {
-  background-color: @destructive_color;
-  color: @bg_color;
-  border-color: @destructive_color;
+  background: linear-gradient(180deg, #ff7370 0%, #ff5f57 100%);
+  color: #ffffff;
+  border-color: #e0443c;
+  box-shadow: 0 2px 8px rgba(255, 95, 87, 0.3);
 }
 
 button.destructive-action:hover {
-  background-color: #f99393;
-  border-color: #f99393;
+  background: linear-gradient(180deg, #ff8580 0%, #ff7370 100%);
+  box-shadow: 0 3px 12px rgba(255, 95, 87, 0.4);
 }
 
 button.flat {
@@ -142,7 +200,8 @@ button.flat {
 }
 
 button.flat:hover {
-  background-color: @bg_tertiary;
+  background-color: rgba(255, 255, 255, 0.06);
+  border-color: transparent;
 }
 
 button.circular {
@@ -156,18 +215,20 @@ button.circular {
 
 entry,
 .entry {
-  background-color: @bg_secondary;
+  background-color: #0a0a16;
   color: @text_primary;
   border: 1px solid @border_color;
   border-radius: 8px;
-  padding: 6px 10px;
-  box-shadow: none;
+  padding: 8px 12px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
   caret-color: @accent_color;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
 }
 
 entry:focus,
 .entry:focus {
-  border-color: @accent_color;
+  border-color: rgba(139, 92, 246, 0.7);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3), 0 0 0 3px rgba(139, 92, 246, 0.15);
   outline: none;
 }
 
@@ -178,12 +239,12 @@ entry:disabled,
 }
 
 entry placeholder {
-  color: @text_secondary;
+  color: #50507a;
 }
 
 /* SpinButton */
 spinbutton {
-  background-color: @bg_secondary;
+  background-color: #0a0a16;
   border: 1px solid @border_color;
   border-radius: 8px;
 }
@@ -192,6 +253,7 @@ spinbutton button {
   background-color: transparent;
   border: none;
   border-radius: 0;
+  box-shadow: none;
 }
 
 spinbutton button:hover {
@@ -200,13 +262,21 @@ spinbutton button:hover {
 
 /* SearchEntry */
 searchentry {
-  background-color: @bg_secondary;
+  background-color: #0a0a16;
   border: 1px solid @border_color;
-  border-radius: 8px;
+  border-radius: 10px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 searchentry:focus {
-  border-color: @accent_color;
+  border-color: rgba(139, 92, 246, 0.7);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3), 0 0 0 3px rgba(139, 92, 246, 0.15);
+}
+
+/* Selection */
+selection {
+  background-color: rgba(139, 92, 246, 0.4);
+  color: @text_primary;
 }
 
 /* ============================================================
@@ -217,12 +287,14 @@ searchentry:focus {
   background-color: @bg_secondary;
   border: 1px solid @border_color;
   border-radius: 12px;
-  padding: 12px;
-  box-shadow: none;
+  padding: 14px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  transition: background-color 150ms ease, box-shadow 150ms ease;
 }
 
 .card:hover {
-  background-color: #19191d;
+  background-color: #161624;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
 }
 
 /* ============================================================
@@ -231,34 +303,41 @@ searchentry:focus {
 
 popover,
 popover.background {
-  background-color: @bg_secondary;
+  background-color: #13131f;
   border: 1px solid @border_color;
-  border-radius: 10px;
-  box-shadow: none;
+  border-radius: 12px;
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.6),
+    0 2px 8px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
   padding: 4px;
 }
 
 popover > arrow {
-  background-color: @bg_secondary;
+  background-color: #13131f;
   border-color: @border_color;
 }
 
 menu {
-  background-color: @bg_secondary;
+  background-color: #13131f;
   border: 1px solid @border_color;
-  border-radius: 10px;
-  padding: 4px 0;
-  box-shadow: none;
+  border-radius: 12px;
+  padding: 6px 0;
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.6),
+    0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 menuitem {
-  padding: 6px 12px;
-  border-radius: 6px;
+  padding: 7px 14px;
+  border-radius: 8px;
   color: @text_primary;
+  margin: 1px 4px;
+  transition: background-color 100ms ease;
 }
 
 menuitem:hover {
-  background-color: @bg_tertiary;
+  background-color: rgba(139, 92, 246, 0.15);
   color: @text_primary;
 }
 
@@ -268,12 +347,13 @@ menuitem:disabled {
 
 menuitem accelerator {
   color: @text_secondary;
+  font-size: 0.85em;
 }
 
 separator.horizontal {
   background-color: @border_color;
   min-height: 1px;
-  margin: 3px 6px;
+  margin: 4px 8px;
 }
 
 /* ============================================================
@@ -285,17 +365,17 @@ listbox {
 }
 
 listbox row {
-  padding: 8px 12px;
-  border-radius: 6px;
-  transition: background-color 80ms ease;
+  padding: 9px 14px;
+  border-radius: 8px;
+  transition: background-color 100ms ease;
 }
 
 listbox row:hover {
-  background-color: @bg_secondary;
+  background-color: rgba(255, 255, 255, 0.05);
 }
 
 listbox row:selected {
-  background-color: @bg_tertiary;
+  background-color: rgba(139, 92, 246, 0.2);
   color: @accent_color;
 }
 
@@ -313,16 +393,21 @@ scrollbar {
 }
 
 scrollbar slider {
-  background-color: #3a3a3e;
-  border-radius: 4px;
-  min-width: 6px;
-  min-height: 6px;
+  background-color: #3a3a58;
+  border-radius: 9999px;
+  min-width: 5px;
+  min-height: 5px;
   margin: 2px;
-  transition: background-color 120ms ease;
+  transition: background-color 150ms ease, min-width 150ms ease;
+}
+
+scrollbar:hover slider {
+  min-width: 7px;
+  background-color: #4a4a70;
 }
 
 scrollbar slider:hover {
-  background-color: #50505a;
+  background-color: #5a5a88;
 }
 
 scrollbar slider:active {
@@ -330,11 +415,16 @@ scrollbar slider:active {
 }
 
 scrollbar.vertical slider {
-  min-width: 6px;
+  min-width: 5px;
 }
 
 scrollbar.horizontal slider {
-  min-height: 6px;
+  min-height: 5px;
+}
+
+scrollbar.overlay-indicator slider {
+  background-color: #3a3a58;
+  opacity: 0.8;
 }
 
 /* ============================================================
@@ -347,23 +437,24 @@ checkbutton {
 }
 
 checkbutton check {
-  background-color: @bg_tertiary;
-  border: 1px solid @border_color;
-  border-radius: 4px;
-  min-width: 16px;
-  min-height: 16px;
+  background-color: #0a0a16;
+  border: 1.5px solid @border_color;
+  border-radius: 5px;
+  min-width: 17px;
+  min-height: 17px;
   box-shadow: none;
-  transition: background-color 120ms ease, border-color 120ms ease;
+  transition: background-color 150ms ease, border-color 150ms ease;
 }
 
 checkbutton check:hover {
-  border-color: @accent_color;
+  border-color: rgba(139, 92, 246, 0.7);
 }
 
 checkbutton:checked check {
   background-color: @accent_color;
   border-color: @accent_color;
-  color: @bg_color;
+  color: #ffffff;
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2);
 }
 
 checkbutton:indeterminate check {
@@ -385,23 +476,24 @@ radiobutton {
 }
 
 radiobutton radio {
-  background-color: @bg_tertiary;
-  border: 1px solid @border_color;
+  background-color: #0a0a16;
+  border: 1.5px solid @border_color;
   border-radius: 9999px;
-  min-width: 16px;
-  min-height: 16px;
+  min-width: 17px;
+  min-height: 17px;
   box-shadow: none;
-  transition: background-color 120ms ease, border-color 120ms ease;
+  transition: background-color 150ms ease, border-color 150ms ease;
 }
 
 radiobutton radio:hover {
-  border-color: @accent_color;
+  border-color: rgba(139, 92, 246, 0.7);
 }
 
 radiobutton:checked radio {
   background-color: @accent_color;
   border-color: @accent_color;
-  color: @bg_color;
+  color: #ffffff;
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2);
 }
 
 radiobutton:disabled radio {
@@ -413,40 +505,42 @@ radiobutton:disabled radio {
    ============================================================ */
 
 switch {
-  background-color: @bg_tertiary;
+  background-color: #22222e;
   border: 1px solid @border_color;
   border-radius: 9999px;
-  min-width: 44px;
-  min-height: 24px;
-  box-shadow: none;
-  transition: background-color 150ms ease, border-color 150ms ease;
+  min-width: 46px;
+  min-height: 26px;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+  transition: background-color 200ms ease, border-color 200ms ease;
 }
 
 switch:checked {
   background-color: @accent_color;
-  border-color: @accent_color;
+  border-color: #7c4ef0;
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2), inset 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 switch:hover {
-  border-color: @accent_color;
+  border-color: rgba(139, 92, 246, 0.5);
 }
 
 switch slider {
-  background-color: @text_secondary;
+  background-color: #e8e8f4;
   border-radius: 9999px;
-  min-width: 18px;
-  min-height: 18px;
+  min-width: 20px;
+  min-height: 20px;
   margin: 2px;
-  box-shadow: none;
-  transition: background-color 150ms ease;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  transition: background-color 200ms ease, margin 200ms ease;
 }
 
 switch:checked slider {
-  background-color: @bg_color;
+  background-color: #ffffff;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
 }
 
 switch:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
 }
 
 /* ============================================================
@@ -458,32 +552,34 @@ progressbar {
 }
 
 progressbar trough {
-  background-color: @bg_tertiary;
+  background-color: #1a1a28;
   border: 1px solid @border_color;
-  border-radius: 4px;
+  border-radius: 9999px;
   min-height: 6px;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 progressbar progress {
-  background-color: @accent_color;
-  border-radius: 4px;
+  background: linear-gradient(90deg, #8b5cf6 0%, #a78bfa 100%);
+  border-radius: 9999px;
   min-height: 6px;
+  box-shadow: 0 0 8px rgba(139, 92, 246, 0.4);
 }
 
 levelbar trough {
-  background-color: @bg_tertiary;
+  background-color: #1a1a28;
   border: 1px solid @border_color;
-  border-radius: 4px;
+  border-radius: 9999px;
   min-height: 6px;
 }
 
 levelbar block.filled {
-  background-color: @accent_color;
-  border-radius: 4px;
+  background: linear-gradient(90deg, #8b5cf6 0%, #a78bfa 100%);
+  border-radius: 9999px;
 }
 
 levelbar block.empty {
-  background-color: @bg_tertiary;
+  background-color: #1a1a28;
 }
 
 /* ============================================================
@@ -491,29 +587,30 @@ levelbar block.empty {
    ============================================================ */
 
 scale trough {
-  background-color: @bg_tertiary;
+  background-color: #1a1a28;
   border: 1px solid @border_color;
-  border-radius: 4px;
+  border-radius: 9999px;
   min-height: 4px;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 scale highlight {
-  background-color: @accent_color;
-  border-radius: 4px;
+  background: linear-gradient(90deg, #8b5cf6 0%, #a78bfa 100%);
+  border-radius: 9999px;
 }
 
 scale slider {
-  background-color: @accent_color;
-  border: 1px solid @accent_color;
+  background: radial-gradient(circle at 40% 35%, #b99ffb, #8b5cf6);
+  border: none;
   border-radius: 9999px;
-  min-width: 16px;
-  min-height: 16px;
-  box-shadow: none;
-  transition: background-color 80ms ease;
+  min-width: 18px;
+  min-height: 18px;
+  box-shadow: 0 2px 6px rgba(139, 92, 246, 0.5);
+  transition: box-shadow 150ms ease;
 }
 
 scale slider:hover {
-  background-color: #b99ffb;
+  box-shadow: 0 3px 10px rgba(139, 92, 246, 0.65);
 }
 
 /* ============================================================
@@ -521,16 +618,17 @@ scale slider:hover {
    ============================================================ */
 
 tooltip {
-  background-color: @bg_secondary;
+  background-color: #13131f;
   color: @text_primary;
   border: 1px solid @border_color;
-  border-radius: 6px;
-  padding: 4px 8px;
-  box-shadow: none;
+  border-radius: 8px;
+  padding: 5px 10px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
 }
 
 tooltip label {
   color: @text_primary;
+  font-size: 0.88em;
 }
 
 /* ============================================================
@@ -561,28 +659,31 @@ notebook {
 }
 
 notebook > header {
-  background-color: @bg_secondary;
+  background: linear-gradient(180deg, #161622 0%, @bg_secondary 100%);
   border-bottom: 1px solid @border_color;
-  padding: 4px;
+  padding: 6px 6px 0;
 }
 
 notebook > header tabs tab {
   background-color: transparent;
   color: @text_secondary;
-  border-radius: 6px;
-  padding: 6px 14px;
-  border: none;
+  border-radius: 8px 8px 0 0;
+  padding: 7px 16px;
+  border: 1px solid transparent;
+  border-bottom: none;
   box-shadow: none;
-  transition: background-color 100ms ease, color 100ms ease;
+  transition: background-color 120ms ease, color 120ms ease;
 }
 
 notebook > header tabs tab:checked {
-  background-color: @bg_tertiary;
+  background-color: @bg_color;
   color: @text_primary;
+  border-color: @border_color;
+  border-bottom-color: @bg_color;
 }
 
 notebook > header tabs tab:hover {
-  background-color: @bg_tertiary;
+  background-color: rgba(255, 255, 255, 0.05);
   color: @text_primary;
 }
 
@@ -596,18 +697,20 @@ notebook > header tabs tab:hover {
 }
 
 .sidebar row {
-  padding: 8px 12px;
-  border-radius: 6px;
+  padding: 9px 14px;
+  border-radius: 8px;
   color: @text_secondary;
+  margin: 1px 4px;
+  transition: background-color 120ms ease, color 120ms ease;
 }
 
 .sidebar row:hover {
-  background-color: @bg_tertiary;
+  background-color: rgba(255, 255, 255, 0.06);
   color: @text_primary;
 }
 
 .sidebar row:selected {
-  background-color: @bg_tertiary;
+  background-color: rgba(139, 92, 246, 0.18);
   color: @accent_color;
 }
 
@@ -621,7 +724,7 @@ dropdown {
   border: 1px solid @border_color;
   border-radius: 8px;
   color: @text_primary;
-  box-shadow: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 combobox button,
@@ -634,7 +737,7 @@ dropdown button {
 
 combobox button:hover,
 dropdown button:hover {
-  background-color: #26262d;
+  background-color: rgba(255, 255, 255, 0.06);
 }
 
 /* ============================================================
@@ -643,7 +746,7 @@ dropdown button:hover {
 
 frame > border {
   border: 1px solid @border_color;
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 8px;
 }
 
@@ -658,7 +761,8 @@ frame.flat > border {
 
 expander title {
   color: @text_primary;
-  padding: 6px 0;
+  padding: 7px 0;
+  transition: color 120ms ease;
 }
 
 expander title:hover {
@@ -676,7 +780,7 @@ expander title:hover {
 .dim-label,
 label.dim-label {
   color: @text_secondary;
-  opacity: 0.7;
+  opacity: 0.75;
 }
 
 .error,
@@ -704,6 +808,7 @@ label.dim-label {
 filechooser .path-bar button {
   background-color: @bg_tertiary;
   border-color: @border_color;
+  border-radius: 8px;
 }
 
 /* ============================================================
@@ -716,4 +821,18 @@ scrolledwindow overshoot {
 
 scrolledwindow undershoot {
   background-color: transparent;
+}
+
+/* ============================================================
+   Panel / Glass surfaces
+   ============================================================ */
+
+.panel-window {
+  background: linear-gradient(180deg, #0d0d1e 0%, #0a0a16 100%);
+  border: 1px solid @border_color;
+  border-radius: 12px;
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.7),
+    0 4px 16px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }

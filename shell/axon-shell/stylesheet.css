@@ -149,6 +149,90 @@
 
 
 /* =============================================================================
+   DOCK — macOS-style floating bottom panel
+   ============================================================================= */
+
+/**
+ * Pill-shaped glass container.
+ * Glass effect: semi-transparent dark fill + blur hint via box-shadow layering.
+ * border-radius 36px gives a fully pill look at 72 px height.
+ */
+.axon-dock {
+    background-color: rgba(10, 10, 18, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 36px;
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.70),
+        0 2px  8px rgba(0, 0, 0, 0.45),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    padding: 8px 16px;
+    spacing: 0;
+}
+
+/**
+ * Individual icon button cell.
+ * 56 × 56 px touch target, rounded for comfortable click area.
+ * Hover lifts the icon slightly via a top-border trick (CSS only — no JS).
+ */
+.axon-dock-icon {
+    border-radius: 14px;
+    padding: 4px;
+    width: 56px;
+    height: 56px;
+    transition-duration: 120ms;
+    transition-timing-function: ease-out;
+    background-color: transparent;
+    border: 1px solid transparent;
+}
+
+.axon-dock-icon:hover {
+    background-color: rgba(139, 92, 246, 0.12);
+    border-color: rgba(139, 92, 246, 0.28);
+}
+
+.axon-dock-icon:focus {
+    background-color: rgba(139, 92, 246, 0.18);
+    border-color: rgba(139, 92, 246, 0.50);
+}
+
+/**
+ * Running-app indicator dot — sits just below the icon inside the cell.
+ */
+.axon-dock-dot {
+    font-size: 6px;
+    color: #8b5cf6;
+    text-align: center;
+    height: 8px;
+    margin-top: -2px;
+}
+
+/**
+ * Vertical separator before the pinned launchers section.
+ */
+.axon-dock-separator {
+    width: 1px;
+    height: 36px;
+    background-color: rgba(255, 255, 255, 0.10);
+    margin: 0 10px;
+}
+
+/**
+ * Tooltip label that floats above icons on hover.
+ */
+.axon-dock-tooltip {
+    background-color: rgba(9, 9, 15, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.60);
+    color: #e8e8f4;
+    font-size: 12px;
+    font-family: "Inter", "Ubuntu", system-ui, sans-serif;
+    font-weight: 500;
+    padding: 4px 10px;
+}
+
+
+/* =============================================================================
    SPACE OSD OVERLAY — shown when switching spaces
    ============================================================================= */
 
@@ -178,4 +262,43 @@
     font-family: "Inter", "Ubuntu", system-ui, sans-serif;
     color: #8b5cf6;
     font-weight: bold;
+}
+
+
+/* =============================================================================
+   DOCK — additional macOS-premium classes
+   ============================================================================= */
+
+.axon-dock {
+    background-color: rgba(15, 15, 25, 0.85);
+    border: 1px solid rgba(58, 58, 88, 0.8);
+    border-radius: 20px;
+    padding: 8px 16px;
+    spacing: 6px;
+}
+.axon-dock-icon {
+    border-radius: 12px;
+    padding: 4px;
+    transition-duration: 200ms;
+}
+.axon-dock-icon:hover {
+    background-color: rgba(139, 92, 246, 0.18);
+    border: 1px solid rgba(139, 92, 246, 0.4);
+}
+.axon-dock-running-dot {
+    color: #8b5cf6;
+    font-size: 6px;
+}
+.axon-dock-separator {
+    background-color: rgba(58, 58, 88, 0.6);
+    width: 1px;
+    margin: 4px 6px;
+}
+.axon-dock-tooltip {
+    background-color: #0d0d1a;
+    color: #e8e8f4;
+    border: 1px solid #2a2a42;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
 }

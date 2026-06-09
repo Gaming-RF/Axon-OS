@@ -108,6 +108,72 @@ docker run --rm \
 
 > Note: `--privileged` is required for `debootstrap` and loop-device operations inside the container. Rootless Docker is not supported for the build stage.
 
+## Graphical Installer (Calamares)
+
+Axon OS ships a fully configured [Calamares](https://calamares.io/) graphical installer so users can install the system from the live ISO without using a terminal.
+
+### Installer layout
+
+```
+installer/
+├── settings.conf                   # Calamares top-level config (module sequence, branding name)
+├── branding/
+│   └── axon/
+│       ├── branding.desc           # Product strings, image paths, accent color (#8b5cf6)
+│       ├── AxonSlideshow.qml       # QML slideshow shown during package install
+│       ├── logo.png                # Product logo (add your own 256×256 PNG)
+│       ├── icon.png                # Product icon  (add your own 64×64 PNG)
+│       └── welcome.png             # Welcome screen image (add your own)
+└── modules/
+    ├── welcome.conf                # Requirement checks (storage ≥ 20 GiB, RAM ≥ 2 GiB)
+    └── finished.conf               # Post-install restart command
+```
+
+### Install sequence
+
+The installer walks the user through these steps in order:
+
+| Step | Module | Description |
+|------|--------|-------------|
+| 1 | `welcome` | Requirement checks + language select |
+| 2 | `locale` | Timezone and locale |
+| 3 | `keyboard` | Keyboard layout |
+| 4 | `partition` | Disk partitioning (auto or manual) |
+| 5 | `users` | Create user account and hostname |
+| 6 | `summary` | Review all choices before writing |
+| — | *(exec)* | Partition, unpack, bootloader, locale hooks |
+| 7 | `finished` | Done — reboot or stay in live session |
+
+### Build copies Calamares config automatically
+
+`build/build.sh` places the Calamares files in the correct locations inside the chroot overlay:
+
+| Source | Destination in live system |
+|--------|---------------------------|
+| `installer/settings.conf` | `/etc/calamares/settings.conf` |
+| `installer/branding/axon/` | `/usr/share/calamares/branding/axon/` |
+| `installer/modules/` | `/etc/calamares/modules/` |
+
+The `calamares` package is included in `build/config/packages.list` so it is installed into the live image automatically.
+
+### Testing the installer in QEMU
+
+Boot the ISO and launch the installer from the welcome app or run:
+
+```bash
+sudo calamares
+```
+
+Use the virtual-disk QEMU workflow described in the "Testing in QEMU" section below to perform a full end-to-end install test without touching real hardware.
+
+### Customizing branding
+
+1. Replace the placeholder image files (`logo.png`, `icon.png`, `welcome.png`) in `installer/branding/axon/` with your own artwork.
+2. Edit `installer/branding/axon/branding.desc` to change `productName`, `version`, or the accent `highlightColor`.
+3. Edit `installer/branding/axon/AxonSlideshow.qml` to add or change the slides shown during installation.
+
+---
+
 ## Customization Guide
 
 ### Package List

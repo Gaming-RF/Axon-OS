@@ -226,39 +226,57 @@ class AIPanelWindow(Adw.Window):
     """Main side-panel window for the Axon AI assistant."""
 
     _CSS: bytes = b"""
+    .panel-window {
+        background: linear-gradient(180deg, #0d0d1e 0%, #0a0a16 100%);
+        border: 1px solid #2a2a42;
+        border-radius: 12px;
+        box-shadow:
+            0 20px 60px rgba(0, 0, 0, 0.7),
+            0 4px 16px rgba(0, 0, 0, 0.4),
+            inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    }
     .panel-header {
-        background-color: #09090f;
+        background: linear-gradient(180deg, #0a0a16 0%, #0d0d1e 100%);
         border-bottom: 1px solid #2a2a42;
+        border-radius: 12px 12px 0 0;
     }
     .bubble-user {
-        background-color: #1e1e30;
-        border-radius: 16px 16px 4px 16px;
+        background-color: #16162a;
+        border-radius: 12px 12px 4px 12px;
         border-left: 3px solid #8b5cf6;
+        box-shadow:
+            0 2px 8px rgba(0, 0, 0, 0.3),
+            inset 0 1px 0 rgba(139, 92, 246, 0.08);
         color: #e8e8f4;
-        padding: 10px 14px;
+        padding: 11px 15px;
     }
     .bubble-assistant {
-        background-color: #111119;
-        border-radius: 4px 16px 16px 16px;
+        background-color: #0f0f1c;
+        border-radius: 4px 12px 12px 12px;
         border: 1px solid #2a2a42;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
         color: #e8e8f4;
-        padding: 10px 14px;
+        padding: 11px 15px;
     }
     .model-badge {
-        background-color: #8b5cf6;
+        background: linear-gradient(135deg, #9d6ff8 0%, #8b5cf6 100%);
         border-radius: 9999px;
         color: white;
         font-size: 11px;
-        padding: 2px 10px;
+        font-weight: 600;
+        padding: 3px 11px;
+        box-shadow: 0 2px 6px rgba(139, 92, 246, 0.35);
     }
     .thinking-label {
         color: #8b5cf6;
         font-size: 13px;
+        font-style: italic;
     }
     .panel-input-area {
-        background-color: #09090f;
+        background: linear-gradient(180deg, transparent 0%, #080810 30%, #080810 100%);
         border-top: 1px solid #2a2a42;
-        padding: 12px;
+        padding: 14px;
+        border-radius: 0 0 12px 12px;
     }
     .copy-btn {
         background-color: transparent;
@@ -266,32 +284,40 @@ class AIPanelWindow(Adw.Window):
         font-size: 11px;
         border: none;
         padding: 2px 6px;
-        border-radius: 4px;
+        border-radius: 6px;
+        transition: all 150ms ease;
     }
     .copy-btn:hover {
         color: #8b5cf6;
         background-color: rgba(139, 92, 246, 0.12);
     }
     .quick-chip {
-        background-color: rgba(139, 92, 246, 0.08);
+        background-color: rgba(139, 92, 246, 0.07);
         color: #8b5cf6;
-        border: 1px solid rgba(139, 92, 246, 0.3);
+        border: 1px solid rgba(139, 92, 246, 0.28);
         border-radius: 9999px;
-        padding: 4px 12px;
+        padding: 4px 13px;
         font-size: 12px;
+        transition: all 150ms ease;
     }
     .quick-chip:hover {
-        background-color: #8b5cf6;
+        background: linear-gradient(135deg, #9d6ff8 0%, #8b5cf6 100%);
         color: white;
+        border-color: #8b5cf6;
+        box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
     }
     .clear-btn {
         color: #50507a;
         background: transparent;
         border: none;
         font-size: 16px;
+        border-radius: 6px;
+        padding: 4px 6px;
+        transition: all 150ms ease;
     }
     .clear-btn:hover {
-        color: #ef4444;
+        color: #ff5f57;
+        background-color: rgba(255, 95, 87, 0.1);
     }
     """
 

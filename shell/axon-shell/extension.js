@@ -13,6 +13,7 @@ import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 
 import SpacesManager from './spaces.js';
 import IntentBar from './intentbar.js';
+import DockManager from './dock.js';
 
 // ─── AxonAIIndicator ──────────────────────────────────────────────────────────
 
@@ -132,8 +133,9 @@ export default class AxonShellExtension extends Extension {
     constructor(metadata) {
         super(metadata);
         this._spacesManager = null;
-        this._intentBar = null;
-        this._aiIndicator = null;
+        this._intentBar     = null;
+        this._aiIndicator   = null;
+        this._dockManager   = null;
         this._keybindingIds = [];
     }
 
@@ -141,8 +143,12 @@ export default class AxonShellExtension extends Extension {
         this._spacesManager = new SpacesManager(this);
         this._spacesManager.enable();
 
+        // IntentBar must be created before DockManager (dock holds a reference)
         this._intentBar = new IntentBar(this, this._spacesManager);
         this._intentBar.enable();
+
+        this._dockManager = new DockManager(this, this._intentBar);
+        this._dockManager.enable();
 
         this._aiIndicator = new AxonAIIndicator(this);
         Main.panel.addToStatusArea('axon-ai-indicator', this._aiIndicator, 0, 'right');
@@ -242,6 +248,12 @@ export default class AxonShellExtension extends Extension {
         if (this._aiIndicator) {
             this._aiIndicator.destroy();
             this._aiIndicator = null;
+        }
+
+        // Dock before IntentBar (dock holds a ref to intentBar)
+        if (this._dockManager) {
+            this._dockManager.disable();
+            this._dockManager = null;
         }
 
         if (this._intentBar) {
