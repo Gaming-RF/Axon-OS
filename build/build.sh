@@ -13,7 +13,7 @@
 #   AXON_BUILD_DIR   Work directory (default: /tmp/axon-build)
 set -euo pipefail
 
-VERSION="0.1.0"
+VERSION="0.2.0"
 ARCH="amd64"
 DIST="noble"
 MIRROR="http://archive.ubuntu.com/ubuntu/"
@@ -57,10 +57,40 @@ check_deps() {
     done
     [[ -f /usr/lib/grub/i386-pc/cdboot.img ]] || missing+=("grub-pc-bin")
     if [[ ${#missing[@]} -gt 0 ]]; then
-        die "Missing tools: ${missing[*]}
-Install with: sudo apt-get install -y debootstrap squashfs-tools xorriso grub-pc-bin grub-efi-amd64-bin mtools dosfstools rsync"
+        log "Missing build dependencies on host: ${missing[*]}"
+        log "Attempting to install missing dependencies automatically..."
+        local pkgs=()
+        for m in "${missing[@]}"; do
+            case "${m}" in
+                debootstrap) pkgs+=("debootstrap") ;;
+                mksquashfs) pkgs+=("squashfs-tools") ;;
+                xorriso) pkgs+=("xorriso") ;;
+                grub-mkstandalone) pkgs+=("grub-pc-bin" "grub-efi-amd64-bin") ;;
+                mkfs.vfat) pkgs+=("dosfstools") ;;
+                mmd|mcopy) pkgs+=("mtools") ;;
+                rsync) pkgs+=("rsync") ;;
+                grub-pc-bin) pkgs+=("grub-pc-bin") ;;
+            esac
+        done
+        local unique_pkgs=()
+        mapfile -t unique_pkgs < <(printf "%s\n" "${pkgs[@]}" | sort -u)
+        log "Installing packages: ${unique_pkgs[*]}"
+        apt-get update
+        apt-get install -y "${unique_pkgs[@]}"
+        
+        # Verify again
+        local still_missing=()
+        for dep in "${deps[@]}"; do
+            command -v "${dep}" &>/dev/null || still_missing+=("${dep}")
+        done
+        [[ -f /usr/lib/grub/i386-pc/cdboot.img ]] || still_missing+=("grub-pc-bin")
+        if [[ ${#still_missing[@]} -gt 0 ]]; then
+            die "Failed to install required dependencies: ${still_missing[*]}"
+        fi
+        log "All build dependencies successfully installed."
+    else
+        log "All build dependencies satisfied."
     fi
-    log "All build dependencies satisfied."
 }
 
 # ---------------------------------------------------------------------------
@@ -73,7 +103,12 @@ mount_chroot() {
     mount --bind /dev/pts "${CHROOT}/dev/pts"
     mount -t proc proc "${CHROOT}/proc"
     mount -t sysfs sysfs "${CHROOT}/sys"
-    cp /etc/resolv.conf "${CHROOT}/etc/resolv.conf"
+    if grep -q "127.0.0.53" /etc/resolv.conf; then
+        log "Host uses systemd-resolved. Writing fallback DNS to chroot resolv.conf..."
+        printf "nameserver 8.8.8.8\nnameserver 1.1.1.1\n" > "${CHROOT}/etc/resolv.conf"
+    else
+        cp /etc/resolv.conf "${CHROOT}/etc/resolv.conf"
+    fi
     MOUNTED=true
 }
 
@@ -202,19 +237,20 @@ EOF
         --modules="part_gpt part_msdos fat iso9660 search configfile normal linux all_video gfxterm" \
         --locales="" --themes="" --fonts="" \
         -o "${STAGING}/bootx64.efi" \
-        "boot/grub/grub.cfg=${STAGING}/grub-embed.cfg"
+        "/boot/grub/grub.cfg=${STAGING}/grub-embed.cfg"
 
     dd if=/dev/zero of="${STAGING}/efiboot.img" bs=1M count=16 status=none
     mkfs.vfat -F 16 "${STAGING}/efiboot.img" >/dev/null
-    mmd -i "${STAGING}/efiboot.img" efi efi/boot
-    mcopy -i "${STAGING}/efiboot.img" "${STAGING}/bootx64.efi" ::efi/boot/bootx64.efi
+    mmd -i "${STAGING}/efiboot.img" ::EFI
+    mmd -i "${STAGING}/efiboot.img" ::EFI/BOOT
+    mcopy -i "${STAGING}/efiboot.img" "${STAGING}/bootx64.efi" ::EFI/BOOT/BOOTX64.EFI
 
     # BIOS: standalone GRUB core prefixed with El Torito CD boot image
     grub-mkstandalone -O i386-pc \
         --modules="linux16 linux normal iso9660 biosdisk memdisk search configfile all_video gfxterm" \
         --locales="" --fonts="" --install-modules="linux16 linux normal iso9660 biosdisk search configfile all_video gfxterm" \
         -o "${STAGING}/core.img" \
-        "boot/grub/grub.cfg=${STAGING}/grub-embed.cfg"
+        "/boot/grub/grub.cfg=${STAGING}/grub-embed.cfg"
     cat /usr/lib/grub/i386-pc/cdboot.img "${STAGING}/core.img" > "${STAGING}/bios.img"
 
     # Integrity checksums for the "Check disc" boot entry
@@ -251,6 +287,19 @@ EOF
     if [[ -n "${SUDO_UID:-}" ]]; then
         chown "${SUDO_UID}:${SUDO_GID:-${SUDO_UID}}" \
             "${DIST_DIR}" "${DIST_DIR}/${ISO_NAME}" "${DIST_DIR}/${ISO_NAME}.sha256"
+    fi
+
+    # Also copy to the user's requested ISO files directory if it exists
+    local iso_dir="${BASE_DIR}/../ISO files"
+    if [[ -d "${iso_dir}" ]]; then
+        log "Copying ISO to workspace ${iso_dir}..."
+        cp "${DIST_DIR}/${ISO_NAME}" "${iso_dir}/${ISO_NAME}"
+        sha256sum "${iso_dir}/${ISO_NAME}" > "${iso_dir}/${ISO_NAME}.sha256"
+        if [[ -n "${SUDO_UID:-}" ]]; then
+            chown "${SUDO_UID}:${SUDO_GID:-${SUDO_UID}}" \
+                "${iso_dir}/${ISO_NAME}" "${iso_dir}/${ISO_NAME}.sha256"
+        fi
+        log "ISO copied to: ${iso_dir}/${ISO_NAME}"
     fi
 
     log "ISO produced: ${DIST_DIR}/${ISO_NAME} ($(du -sh "${DIST_DIR}/${ISO_NAME}" | cut -f1))"
