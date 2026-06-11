@@ -199,21 +199,14 @@ build_image_tree() {
 
     cat > "${IMAGE}/boot/grub/grub.cfg" <<EOF
 set default="0"
-set timeout=10
+set timeout=0
+set timeout_style=hidden
 
 insmod all_video
 insmod gfxterm
 
 menuentry "Try or Install Axon OS ${VERSION}" {
     linux /casper/vmlinuz boot=casper quiet splash ---
-    initrd /casper/initrd
-}
-menuentry "Axon OS (safe graphics)" {
-    linux /casper/vmlinuz boot=casper nomodeset quiet splash ---
-    initrd /casper/initrd
-}
-menuentry "Check disc for defects" {
-    linux /casper/vmlinuz boot=casper integrity-check quiet splash ---
     initrd /casper/initrd
 }
 EOF

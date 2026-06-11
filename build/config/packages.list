@@ -209,3 +209,44 @@ acpi
 acpid
 upower
 
+# ── App Development ───────────────────────────────────────────────────────────
+build-essential
+cmake
+pkg-config
+git
+curl
+wget
+python3-venv
+python3-dev
+nodejs
+npm
+golang
+docker.io
+docker-compose-v2
+
+# ── Gaming ────────────────────────────────────────────────────────────────────
+steam-installer
+steam-devices
+lutris
+gamemode
+mangohud
+wine64
+wine32:i386
+
+# ── Everyday Tasks & Utilities ────────────────────────────────────────────────
+flatpak
+gnome-software-plugin-flatpak
+libreoffice
+vlc
+transmission-gtk
+file-roller
+
+# ── Architectural Pillars ──────────────────────────────────────────────────────
+# Self-healing snapshots
+timeshift
+grub-btrfs
+# Intelligent hardware routing
+switcheroo-control
+irqbalance
+# Cross-device continuity
+gnome-shell-extension-gsconnect

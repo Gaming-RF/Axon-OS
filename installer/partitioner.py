@@ -67,7 +67,7 @@ class Partitioner:
         read-only enumeration.
         """
         result = subprocess.run(
-            ["lsblk", "-J", "-o", "NAME,SIZE,MODEL,TYPE,FSTYPE"],
+            ["lsblk", "-J", "-o", "NAME,SIZE,MODEL,TYPE,FSTYPE,RO"],
             capture_output=True,
             text=True,
             check=True,
@@ -77,6 +77,9 @@ class Partitioner:
 
         for device in data.get("blockdevices", []):
             if device.get("type") != "disk":
+                continue
+            # Skip read-only devices (e.g. some live USBs or mounted ISOs)
+            if device.get("ro") is True or device.get("ro") == "1":
                 continue
 
             partitions: list[PartitionInfo] = []
@@ -202,7 +205,7 @@ class Partitioner:
             
             # Step 3: Create new root partition in the freed space
             # Start from the new end of the shrunk partition, end at 100% of the disk
-            self._run(["parted", "-s", device, "mkpart", "root", "ext4", f"{new_end_mib}MiB", "100%"])
+            self._run(["parted", "-s", device, "mkpart", "root", "btrfs", f"{new_end_mib}MiB", "100%"])
             
             # Find new partition number (typically pmap count + 1)
             # Fetch the updated partition map to confirm number
@@ -218,7 +221,7 @@ class Partitioner:
 
         Partition table:
           1. EFI  FAT32  1 MiB – 513 MiB  (with esp + boot flags)
-          2. Root ext4   513 MiB – 100%
+          2. Root btrfs  513 MiB – 100%
         """
         self._run(["parted", "-s", device, "mklabel", "gpt"])
 
@@ -233,7 +236,7 @@ class Partitioner:
         # Root partition
         self._run([
             "parted", "-s", device,
-            "mkpart", "root", "ext4", "513MiB", "100%",
+            "mkpart", "root", "btrfs", "513MiB", "100%",
         ])
 
     def format_partitions(self, device: str) -> None:
@@ -248,13 +251,13 @@ class Partitioner:
         # EFI — FAT32
         self._run(["mkfs.fat", "-F32", efi_part])
 
-        # Root — ext4  (-F forces even if already formatted)
-        self._run(["mkfs.ext4", "-F", root_part])
+        # Root — btrfs
+        self._run(["mkfs.btrfs", "-f", root_part])
 
     def format_partitions_alongside(self, device: str, root_partition_num: int) -> None:
         """Format only the newly created alongside root partition."""
         root_part = f"{device}p{root_partition_num}" if device[-1].isdigit() else f"{device}{root_partition_num}"
-        self._run(["mkfs.ext4", "-F", root_part])
+        self._run(["mkfs.btrfs", "-f", root_part])
 
     def mount_partitions(self, device: str, mount_point: str) -> None:
         """Mount root then EFI under *mount_point*.
@@ -264,8 +267,22 @@ class Partitioner:
         efi_part  = f"{device}p1" if device[-1].isdigit() else f"{device}1"
         root_part = f"{device}p2" if device[-1].isdigit() else f"{device}2"
 
-        # Mount root first
-        self._run(["mount", root_part, mount_point])
+        import tempfile
+        import os
+
+        # BTRFS subvolumes: create @ and @home
+        with tempfile.TemporaryDirectory() as tmp_mnt:
+            self._run(["mount", root_part, tmp_mnt])
+            self._run(["btrfs", "subvolume", "create", f"{tmp_mnt}/@"])
+            self._run(["btrfs", "subvolume", "create", f"{tmp_mnt}/@home"])
+            self._run(["umount", tmp_mnt])
+
+        # Mount the @ subvolume to the target mount_point
+        self._run(["mount", "-o", "subvol=@", root_part, mount_point])
+
+        # Mount @home
+        os.makedirs(f"{mount_point}/home", exist_ok=True)
+        self._run(["mount", "-o", "subvol=@home", root_part, f"{mount_point}/home"])
 
         # Create EFI mount point and mount
         efi_mount = f"{mount_point}/boot/efi"
@@ -277,8 +294,22 @@ class Partitioner:
         efi_part  = f"{device}p{efi_partition_num}" if device[-1].isdigit() else f"{device}{efi_partition_num}"
         root_part = f"{device}p{root_partition_num}" if device[-1].isdigit() else f"{device}{root_partition_num}"
 
-        # Mount root partition
-        self._run(["mount", root_part, mount_point])
+        import tempfile
+        import os
+
+        # BTRFS subvolumes: create @ and @home
+        with tempfile.TemporaryDirectory() as tmp_mnt:
+            self._run(["mount", root_part, tmp_mnt])
+            self._run(["btrfs", "subvolume", "create", f"{tmp_mnt}/@"])
+            self._run(["btrfs", "subvolume", "create", f"{tmp_mnt}/@home"])
+            self._run(["umount", tmp_mnt])
+
+        # Mount the @ subvolume to the target mount_point
+        self._run(["mount", "-o", "subvol=@", root_part, mount_point])
+
+        # Mount @home
+        os.makedirs(f"{mount_point}/home", exist_ok=True)
+        self._run(["mount", "-o", "subvol=@home", root_part, f"{mount_point}/home"])
 
         # Mount existing EFI partition
         efi_mount = f"{mount_point}/boot/efi"

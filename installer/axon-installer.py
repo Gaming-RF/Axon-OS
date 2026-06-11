@@ -632,9 +632,11 @@ class InstallerApp(Adw.ApplicationWindow):
                 # Write fstab
                 fstab_content = ""
                 if root_uuid:
-                    fstab_content += f"UUID={root_uuid} / ext4 defaults,noatime 0 1\n"
+                    fstab_content += f"UUID={root_uuid} / btrfs subvol=@,defaults,noatime,space_cache=v2 0 0\n"
+                    fstab_content += f"UUID={root_uuid} /home btrfs subvol=@home,defaults,noatime,space_cache=v2 0 0\n"
                 else:
-                    fstab_content += f"{root_device} / ext4 defaults,noatime 0 1\n"
+                    fstab_content += f"{root_device} / btrfs subvol=@,defaults,noatime,space_cache=v2 0 0\n"
+                    fstab_content += f"{root_device} /home btrfs subvol=@home,defaults,noatime,space_cache=v2 0 0\n"
                 if efi_uuid:
                     fstab_content += f"UUID={efi_uuid} /boot/efi vfat defaults 0 2\n"
                 else:
@@ -664,14 +666,14 @@ class InstallerApp(Adw.ApplicationWindow):
 
                 # Write keyboard
                 keymap = user_info.get("keymap", "us")
-                kbd_content = f'XKBMODEL="pc105"\\nXKBLAYOUT="{keymap}"\\nXKBVARIANT=""\\nXKBOPTIONS=""\\nBACKSPACE="guess"\\n'
+                kbd_content = f'XKBMODEL="pc105"\nXKBLAYOUT="{keymap}"\nXKBVARIANT=""\nXKBOPTIONS=""\nBACKSPACE="guess"\n'
                 os.makedirs(os.path.join(mount, "etc", "default"), exist_ok=True)
                 with open(os.path.join(mount, "etc", "default", "keyboard"), "w") as f:
                     f.write(kbd_content)
 
                 # Enable OS Prober for GRUB dual-boot detection
                 with open(os.path.join(mount, "etc", "default", "grub"), "a") as f:
-                    f.write("\\nGRUB_DISABLE_OS_PROBER=false\\n")
+                    f.write("\nGRUB_DISABLE_OS_PROBER=false\n")
 
                 # Create user with password via chpasswd
                 username = user_info["username"]
@@ -680,7 +682,7 @@ class InstallerApp(Adw.ApplicationWindow):
                 subprocess.run(["chroot", mount, "useradd", "-m", "-s", "/bin/bash", username], check=True)
                 
                 proc = subprocess.Popen(["chroot", mount, "chpasswd"], stdin=subprocess.PIPE, text=True)
-                proc.communicate(f"{username}:{password}\\n")
+                proc.communicate(f"{username}:{password}\n")
                 if proc.returncode != 0:
                     raise RuntimeError("Failed to set user password.")
 
@@ -698,7 +700,7 @@ class InstallerApp(Adw.ApplicationWindow):
                 subprocess.run(["chroot", mount, "chmod", "600", "/swapfile"], check=False)
                 subprocess.run(["chroot", mount, "mkswap", "/swapfile"], check=False)
                 with open(os.path.join(mount, "etc", "fstab"), "a") as f:
-                    f.write("/swapfile none swap sw 0 0\\n")
+                    f.write("/swapfile none swap sw 0 0\n")
 
             self._set_progress(0.90, "Installing bootloader (configuring dual boot GRUB)…")
             if not part.dry_run:
@@ -734,15 +736,17 @@ class InstallerApp(Adw.ApplicationWindow):
                     subprocess.run(["umount", "-l", os.path.join(mount, "run")], check=True)
 
             self._set_progress(1.00, "Installation complete!")
-            if not part.dry_run:
-                # Clean up target mounts
-                subprocess.run(["umount", "-l", os.path.join(mount, "boot/efi")], check=True)
-                subprocess.run(["umount", "-l", mount], check=True)
-
             GLib.idle_add(self._show_done_dialog)
 
         except Exception as exc:
             GLib.idle_add(self._show_error_dialog, str(exc))
+        finally:
+            # Clean up target mounts safely
+            try:
+                subprocess.run(["umount", "-l", os.path.join(mount, "boot/efi")], check=False, capture_output=True)
+                subprocess.run(["umount", "-l", mount], check=False, capture_output=True)
+            except Exception:
+                pass
 
     def _show_done_dialog(self) -> None:
         dialog = Adw.MessageDialog(

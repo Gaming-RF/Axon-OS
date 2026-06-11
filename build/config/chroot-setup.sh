@@ -33,6 +33,7 @@ EOF
 # debootstrap may have created the new deb822 file; sources.list wins, drop it
 rm -f /etc/apt/sources.list.d/ubuntu.sources
 
+dpkg --add-architecture i386
 apt-get update
 
 # ---------------------------------------------------------------------------
@@ -72,6 +73,9 @@ if ! apt-get install -y "${PACKAGES[@]}"; then
         apt-get install -y "${p}" || log "WARNING: package ${p} failed to install"
     done
 fi
+
+log "Adding flathub remote..."
+flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo || true
 
 log "Installing Python AI libraries inside chroot..."
 pip3 install faster-whisper sqlite-vec --break-system-packages || log "WARNING: Python AI libraries failed to install"
@@ -143,6 +147,7 @@ fi
 # First-boot + ollama helper scripts
 install -Dm755 "${SRC}/build/config/firstboot.sh" /usr/local/bin/axon-firstboot
 install -Dm755 "${SRC}/build/config/ollama-setup.sh" /usr/local/bin/axon-ollama-setup
+install -Dm755 "${SRC}/system/axon-updater.py" /usr/local/bin/axon-update
 
 mkdir -p /etc/skel/.config/autostart
 cat > /etc/skel/.config/autostart/axon-firstboot.desktop <<'EOF'
