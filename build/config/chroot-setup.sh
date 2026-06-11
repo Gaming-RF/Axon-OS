@@ -106,26 +106,28 @@ for f in "${SRC}/data/applications/"*.desktop; do
         > "/usr/share/applications/$(basename "${f}")"
 done
 
-# D-Bus session activation files (resolve AXON_SERVICES_DIR)
+# D-Bus session activation files (resolve AXON_SERVICES_DIR) — every
+# service directory that ships org.axonos.*.service / *.conf is registered.
 mkdir -p /usr/share/dbus-1/services /usr/share/dbus-1/session.d
-sed "s|AXON_SERVICES_DIR|${SERVICES_DIR}|g" \
-    "${SERVICES_DIR}/axon-brain/org.axonos.Brain.service" \
-    > /usr/share/dbus-1/services/org.axonos.Brain.service
-sed "s|AXON_SERVICES_DIR|${SERVICES_DIR}|g" \
-    "${SERVICES_DIR}/axon-context/org.axonos.Context.service" \
-    > /usr/share/dbus-1/services/org.axonos.Context.service
-cp "${SERVICES_DIR}/axon-brain/org.axonos.Brain.conf" /usr/share/dbus-1/session.d/
-cp "${SERVICES_DIR}/axon-context/org.axonos.Context.conf" /usr/share/dbus-1/session.d/
+for activation in "${SERVICES_DIR}"/*/org.axonos.*.service; do
+    [[ -f "${activation}" ]] || continue
+    sed "s|AXON_SERVICES_DIR|${SERVICES_DIR}|g" "${activation}" \
+        > "/usr/share/dbus-1/services/$(basename "${activation}")"
+done
+for buspolicy in "${SERVICES_DIR}"/*/org.axonos.*.conf; do
+    [[ -f "${buspolicy}" ]] && cp "${buspolicy}" /usr/share/dbus-1/session.d/
+done
 
 # systemd user units, enabled globally for every user
 mkdir -p /usr/lib/systemd/user
-sed "s|AXON_SERVICES_DIR|${SERVICES_DIR}|g" \
-    "${SERVICES_DIR}/axon-brain/axon-brain.service" \
-    > /usr/lib/systemd/user/axon-brain.service
-sed "s|AXON_SERVICES_DIR|${SERVICES_DIR}|g" \
-    "${SERVICES_DIR}/axon-context/axon-context.service" \
-    > /usr/lib/systemd/user/axon-context.service
-systemctl --global enable axon-brain.service axon-context.service
+AXON_USER_UNITS=()
+for unit in "${SERVICES_DIR}"/*/axon-*.service; do
+    [[ -f "${unit}" ]] || continue
+    sed "s|AXON_SERVICES_DIR|${SERVICES_DIR}|g" "${unit}" \
+        > "/usr/lib/systemd/user/$(basename "${unit}")"
+    AXON_USER_UNITS+=("$(basename "${unit}")")
+done
+systemctl --global enable "${AXON_USER_UNITS[@]}"
 
 # GNOME Shell extension, system-wide
 EXT_DIR="/usr/share/gnome-shell/extensions/axon-shell@axon-os"
@@ -148,6 +150,25 @@ fi
 install -Dm755 "${SRC}/build/config/firstboot.sh" /usr/local/bin/axon-firstboot
 install -Dm755 "${SRC}/build/config/ollama-setup.sh" /usr/local/bin/axon-ollama-setup
 install -Dm755 "${SRC}/system/axon-updater.py" /usr/local/bin/axon-update
+
+# Voice push-to-talk toggle (bound to Super+V via the gschema override)
+install -Dm755 "${SRC}/build/config/axon-voice-toggle" /usr/local/bin/axon-voice-toggle
+
+# Rogue Software Shield CLI wrapper
+cat > /usr/local/bin/axon-shield <<EOF
+#!/bin/sh
+exec /usr/bin/python3 ${SERVICES_DIR}/axon-sandbox/shield.py "\$@"
+EOF
+chmod 755 /usr/local/bin/axon-shield
+
+# Self-healing boot watchdog: GRUB counter + rollback entry + reset unit.
+# The grub.d scripts only emit anything on installed btrfs systems.
+install -Dm755 "${SRC}/build/config/axon-boot-ok.sh" /usr/local/bin/axon-boot-ok
+install -Dm644 "${SRC}/build/config/axon-boot-ok.service" \
+    /etc/systemd/system/axon-boot-ok.service
+systemctl enable axon-boot-ok.service || log "WARNING: could not enable axon-boot-ok"
+install -Dm755 "${SRC}/build/config/grub.d-06_axon_watchdog" /etc/grub.d/06_axon_watchdog
+install -Dm755 "${SRC}/build/config/grub.d-42_axon_rollback" /etc/grub.d/42_axon_rollback
 
 mkdir -p /etc/skel/.config/autostart
 cat > /etc/skel/.config/autostart/axon-firstboot.desktop <<'EOF'
@@ -248,6 +269,14 @@ edge-tiling=true
 
 [org.gnome.desktop.peripherals.touchpad]
 tap-to-click=true
+
+[org.gnome.settings-daemon.plugins.media-keys]
+custom-keybindings=['/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/axon-voice/']
+
+[org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/axon-voice/]
+name='Axon Voice (push-to-talk)'
+command='/usr/local/bin/axon-voice-toggle'
+binding='<Super>v'
 
 [org.gnome.shell]
 enabled-extensions=['axon-shell@axon-os', '${USER_THEME_EXT}']
