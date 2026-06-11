@@ -10,7 +10,7 @@ ruff>=0.1.0
 
 # Type checking
 mypy>=1.5.0
-types-PyGObject>=1.2.0
+PyGObject-stubs>=2.10
 
 # Code formatting
 black>=23.9.0
