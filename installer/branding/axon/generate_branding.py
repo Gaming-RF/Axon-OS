@@ -14,8 +14,8 @@ from PIL import Image, ImageDraw, ImageFilter
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
-VIOLET = (139, 92, 246)
-VIOLET_LIGHT = (167, 139, 250)
+BLUE = (37, 99, 235)
+BLUE_LIGHT = (96, 165, 250)
 BG_DARK = (15, 15, 23)
 
 
@@ -31,24 +31,24 @@ def _hexagon(center, radius, rotation=math.pi / 6):
 
 
 def draw_mark(size, transparent=True):
-    """Axon hexagon mark with a soft violet glow."""
+    """Axon hexagon mark with a soft blue glow."""
     img = Image.new(
         "RGBA", (size, size), (0, 0, 0, 0) if transparent else BG_DARK + (255,)
     )
 
     glow = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     gd = ImageDraw.Draw(glow)
-    gd.polygon(_hexagon((size / 2, size / 2), size * 0.36), fill=VIOLET + (180,))
+    gd.polygon(_hexagon((size / 2, size / 2), size * 0.36), fill=BLUE + (180,))
     glow = glow.filter(ImageFilter.GaussianBlur(size * 0.09))
     img.alpha_composite(glow)
 
     d = ImageDraw.Draw(img)
     d.polygon(
         _hexagon((size / 2, size / 2), size * 0.34),
-        outline=VIOLET_LIGHT + (255,),
+        outline=BLUE_LIGHT + (255,),
         width=max(2, size // 28),
     )
-    d.polygon(_hexagon((size / 2, size / 2), size * 0.20), fill=VIOLET + (255,))
+    d.polygon(_hexagon((size / 2, size / 2), size * 0.20), fill=BLUE + (255,))
     r = size * 0.055
     d.ellipse(
         (size / 2 - r, size / 2 - r, size / 2 + r, size / 2 + r),

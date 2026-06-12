@@ -27,10 +27,10 @@ def main():
 
     # Aurora bands drawn at quarter resolution, blurred, then composited
     bands = [
-        ((139, 92, 246), 0.34, 230, 90),   # violet
-        ((76, 29, 149), 0.52, 320, 60),    # deep purple
+        ((37, 99, 235), 0.34, 230, 90),    # electric blue
+        ((29, 78, 216), 0.52, 320, 60),    # dark royal blue
         ((34, 211, 238), 0.30, 130, 38),   # cyan accent
-        ((167, 139, 250), 0.62, 180, 46),  # light violet
+        ((96, 165, 250), 0.62, 180, 46),   # light sky blue
     ]
     sw, sh = W // 4, H // 4
     overlay = Image.new("RGB", (sw, sh), (0, 0, 0))

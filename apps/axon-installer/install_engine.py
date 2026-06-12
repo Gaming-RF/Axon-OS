@@ -375,7 +375,13 @@ def mount_chroot_binds() -> None:
         os.makedirs(f"{TARGET}/{target}", exist_ok=True)
         run(["mount", "--bind", fs, f"{TARGET}/{target}"])
     if os.path.exists("/etc/resolv.conf"):
-        shutil.copy("/etc/resolv.conf", f"{TARGET}/etc/resolv.conf")
+        dest = f"{TARGET}/etc/resolv.conf"
+        if os.path.lexists(dest):
+            try:
+                os.remove(dest)
+            except OSError:
+                pass
+        shutil.copy("/etc/resolv.conf", dest)
 
 
 def unmount_all() -> None:

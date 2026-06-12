@@ -197,17 +197,43 @@ build_image_tree() {
     # GRUB search marker so the bootloader finds this volume on any device
     touch "${IMAGE}/${VOLID}"
 
+    # Copy custom GRUB theme into image
+    mkdir -p "${IMAGE}/boot/grub/themes"
+    cp -r "${BASE_DIR}/theme/grub/axon" "${IMAGE}/boot/grub/themes/"
+    cp "${CHROOT}/usr/share/grub/unicode.pf2" "${IMAGE}/boot/grub/themes/axon/unicode.pf2" || \
+    cp /usr/share/grub/unicode.pf2 "${IMAGE}/boot/grub/themes/axon/unicode.pf2" || true
+
     cat > "${IMAGE}/boot/grub/grub.cfg" <<EOF
 set default="0"
-set timeout=0
-set timeout_style=hidden
+set timeout=5
+set timeout_style=menu
 
 insmod all_video
 insmod gfxterm
+insmod png
+insmod font
 
-menuentry "Try or Install Axon OS ${VERSION}" {
+if loadfont /boot/grub/themes/axon/unicode.pf2 ; then
+    set theme=/boot/grub/themes/axon/theme.txt
+fi
+
+menuentry "Try or Install Axon OS ${VERSION}" --class axonos {
     linux /casper/vmlinuz boot=casper quiet splash ---
     initrd /casper/initrd
+}
+
+menuentry "Try or Install Axon OS ${VERSION} (safe graphics)" --class safe {
+    linux /casper/vmlinuz boot=casper quiet splash nomodeset ---
+    initrd /casper/initrd
+}
+
+menuentry "Try or Install Axon OS ${VERSION} (modern NVIDIA drivers)" --class nvidia {
+    linux /casper/vmlinuz boot=casper quiet splash nouveau.modeset=0 nvidia-drm.modeset=1 ---
+    initrd /casper/initrd
+}
+
+menuentry "Power Off" --class power {
+    halt
 }
 EOF
 }
@@ -227,7 +253,7 @@ EOF
 
     # UEFI: standalone GRUB EFI binary inside a FAT image
     grub-mkstandalone -O x86_64-efi \
-        --modules="part_gpt part_msdos fat iso9660 search configfile normal linux all_video gfxterm" \
+        --modules="part_gpt part_msdos fat iso9660 search configfile normal linux all_video gfxterm png font" \
         --locales="" --themes="" --fonts="" \
         -o "${STAGING}/bootx64.efi" \
         "/boot/grub/grub.cfg=${STAGING}/grub-embed.cfg"
@@ -240,8 +266,8 @@ EOF
 
     # BIOS: standalone GRUB core prefixed with El Torito CD boot image
     grub-mkstandalone -O i386-pc \
-        --modules="linux16 linux normal iso9660 biosdisk memdisk search configfile all_video gfxterm" \
-        --locales="" --fonts="" --install-modules="linux16 linux normal iso9660 biosdisk search configfile all_video gfxterm" \
+        --modules="linux16 linux normal iso9660 biosdisk memdisk search configfile all_video gfxterm png font" \
+        --locales="" --fonts="" --install-modules="linux16 linux normal iso9660 biosdisk search configfile all_video gfxterm png font" \
         -o "${STAGING}/core.img" \
         "/boot/grub/grub.cfg=${STAGING}/grub-embed.cfg"
     cat /usr/lib/grub/i386-pc/cdboot.img "${STAGING}/core.img" > "${STAGING}/bios.img"

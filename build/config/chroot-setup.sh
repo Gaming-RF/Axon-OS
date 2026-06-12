@@ -198,7 +198,6 @@ install -Dm755 "${SRC}/build/config/firstboot.sh" /usr/local/bin/axon-firstboot
 install -Dm755 "${SRC}/build/config/ollama-setup.sh" /usr/local/bin/axon-ollama-setup
 install -Dm755 "${SRC}/system/axon-updater.py" /usr/local/bin/axon-update
 
-<<<<<<< HEAD
 # Install Axon Voice overlay & Sandbox / Watchdog helpers
 mkdir -p /usr/lib/axon/apps/axon-voice-overlay
 install -Dm755 "${SRC}/apps/axon-voice-overlay/main.py" /usr/lib/axon/apps/axon-voice-overlay/main.py
@@ -238,7 +237,7 @@ else
 fi
 EOF
 fi
-=======
+
 # Voice push-to-talk toggle (bound to Super+V via the gschema override)
 install -Dm755 "${SRC}/build/config/axon-voice-toggle" /usr/local/bin/axon-voice-toggle
 
@@ -257,7 +256,23 @@ install -Dm644 "${SRC}/build/config/axon-boot-ok.service" \
 systemctl enable axon-boot-ok.service || log "WARNING: could not enable axon-boot-ok"
 install -Dm755 "${SRC}/build/config/grub.d-06_axon_watchdog" /etc/grub.d/06_axon_watchdog
 install -Dm755 "${SRC}/build/config/grub.d-42_axon_rollback" /etc/grub.d/42_axon_rollback
->>>>>>> origin/main
+
+# Copy and configure polished GRUB theme for installed system
+log "Installing polished GRUB theme..."
+mkdir -p /boot/grub/themes
+cp -r "${SRC}/theme/grub/axon" /boot/grub/themes/
+cp /usr/share/grub/unicode.pf2 /boot/grub/themes/axon/unicode.pf2 || true
+
+if [[ -f /etc/default/grub ]]; then
+    log "Configuring system GRUB default settings..."
+    # Ensure timeout style is menu and timeout is 5 seconds
+    sed -i 's/^GRUB_TIMEOUT_STYLE=.*/GRUB_TIMEOUT_STYLE=menu/' /etc/default/grub
+    sed -i 's/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=5/' /etc/default/grub
+    
+    # Remove existing GRUB_THEME setting if any and append the custom one
+    sed -i '/^GRUB_THEME=/d' /etc/default/grub
+    echo 'GRUB_THEME="/boot/grub/themes/axon/theme.txt"' >> /etc/default/grub
+fi
 
 mkdir -p /etc/skel/.config/autostart
 cat > /etc/skel/.config/autostart/axon-firstboot.desktop <<'EOF'
@@ -308,9 +323,9 @@ GTK_THEME_NAME='axon-gtk'
 ICON_THEME_NAME='Papirus-Dark'
 SHELL_THEME_NAME=''
 if git clone --depth=1 https://github.com/vinceliuice/WhiteSur-gtk-theme.git /tmp/wsg \
-   && /tmp/wsg/install.sh -d /usr/share/themes -c Dark -t purple -N glassy; then
-    GTK_THEME_NAME='WhiteSur-Dark-purple'
-    SHELL_THEME_NAME='WhiteSur-Dark-purple'
+   && /tmp/wsg/install.sh -d /usr/share/themes -c Dark -N glassy; then
+    GTK_THEME_NAME='WhiteSur-Dark'
+    SHELL_THEME_NAME='WhiteSur-Dark'
 else
     log "WARNING: WhiteSur GTK theme install failed — keeping axon-gtk"
 fi

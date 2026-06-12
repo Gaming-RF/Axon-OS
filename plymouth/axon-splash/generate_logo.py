@@ -13,7 +13,7 @@ import zlib
 WIDTH  = 400
 HEIGHT = 400
 BG     = (14,  14,  16)   # dark near-black
-FG     = (167, 139, 250)  # violet #a78bfa
+FG     = (96, 165, 250)  # sky blue #60a5fa
 RADIUS = 60
 
 
