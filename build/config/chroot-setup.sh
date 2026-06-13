@@ -10,7 +10,7 @@ export LC_ALL=C
 export HOME=/root
 
 SRC="/opt/axon-src"
-VERSION="${AXON_VERSION:-0.2.1}"
+VERSION="${AXON_VERSION:-0.3.0}"
 CODENAME="Pulse"
 
 log() { echo "[chroot-setup] $*"; }

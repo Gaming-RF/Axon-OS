@@ -54,7 +54,7 @@ infer_tag() {
         git describe --tags --abbrev=0
         return 0
     fi
-    echo "v0.1.0"
+    echo "v0.3.0"
 }
 
 release_tag="${1:-$(infer_tag)}"

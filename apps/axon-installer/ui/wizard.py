@@ -29,6 +29,21 @@ ENGINE_WRAPPER = "/usr/local/bin/axon-install-engine"
 USERNAME_RE = re.compile(r"^[a-z][a-z0-9-]{0,31}$")
 HOSTNAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9-]{0,62}$")
 
+
+def _os_version() -> str:
+    """Version + codename string from /etc/axon-release, with a safe default."""
+    version, codename = "0.3.0", "Pulse"
+    try:
+        for line in Path("/etc/axon-release").read_text().splitlines():
+            key, _, value = line.partition("=")
+            if key == "AXON_VERSION" and value.strip():
+                version = value.strip()
+            elif key == "AXON_CODENAME" and value.strip():
+                codename = value.strip()
+    except OSError:
+        pass
+    return f'{version} "{codename}"'
+
 OLLAMA_MODELS = [
     ("llama3.2:1b", "Llama 3.2 1B", "1.3 GB — fastest, great for the Intent Bar"),
     ("llama3.2:3b", "Llama 3.2 3B", "2.0 GB — recommended balance (default)"),
@@ -246,7 +261,7 @@ class InstallerWindow(Adw.Window):
         head.set_margin_bottom(28)
         head.append(_label("⬡", "sidebar-logo", halign=Gtk.Align.CENTER))
         head.append(_label("Axon OS", "sidebar-product", halign=Gtk.Align.CENTER))
-        head.append(_label("0.1.0 “Pulse” — AI-native desktop",
+        head.append(_label(f"{_os_version()} — AI-native desktop",
                            "sidebar-version", halign=Gtk.Align.CENTER))
         side.append(head)
 

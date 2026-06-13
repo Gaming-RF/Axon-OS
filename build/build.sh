@@ -13,15 +13,17 @@
 #   AXON_BUILD_DIR   Work directory (default: /tmp/axon-build)
 set -euo pipefail
 
-VERSION="0.2.1"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BASE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+# Single source of truth: the version field in pyproject.toml.
+VERSION="$(sed -n 's/^version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "${BASE_DIR}/pyproject.toml" | head -1)"
+VERSION="${VERSION:-0.3.0}"
 ARCH="amd64"
 DIST="noble"
 MIRROR="http://archive.ubuntu.com/ubuntu/"
 ISO_NAME="axon-os-${VERSION}-${ARCH}.iso"
 VOLID="AXON_OS"
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BASE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 WORK_DIR="${AXON_BUILD_DIR:-/tmp/axon-build}"
 CHROOT="${WORK_DIR}/chroot"

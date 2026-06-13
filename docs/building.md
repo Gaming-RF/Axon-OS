@@ -70,7 +70,7 @@ qemu-system-x86_64 \
     -m 4G \
     -smp 4 \
     -cpu host \
-    -drive file=dist/axon-os-0.1.0-amd64.iso,format=raw,if=virtio \
+    -drive file=dist/axon-os-0.3.0-amd64.iso,format=raw,if=virtio \
     -bios /usr/share/ovmf/OVMF.fd \
     -vga virtio \
     -display gtk,gl=on \
@@ -90,7 +90,7 @@ qemu-system-x86_64 \
     -smp 4 \
     -cpu host \
     -drive file=axon-test.qcow2,format=qcow2,if=virtio \
-    -cdrom dist/axon-os-0.1.0-amd64.iso \
+    -cdrom dist/axon-os-0.3.0-amd64.iso \
     -bios /usr/share/ovmf/OVMF.fd \
     -vga virtio \
     -display gtk,gl=on \
