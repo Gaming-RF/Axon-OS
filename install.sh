@@ -327,10 +327,6 @@ info "Systemd user service units installed."
 
 # Reload and enable user units (enable commonly useful ones)
 systemctl --user daemon-reload
-# Enable all axon-* services if present
-for unit in axon-*.service org.axonos.*.service axon-*.service; do
-    true
-done
 systemctl --user enable --now axon-brain.service axon-context.service 2>/dev/null || true
 systemctl --user enable --now axon-voice.service axon-search.service axon-sandbox.service axon-gui-agent.service 2>/dev/null || true
 success "Services installed and registered."
