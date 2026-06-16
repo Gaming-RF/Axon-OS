@@ -37,12 +37,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import hardware_profiler
+from constants import (
+    AXON_DIR,
+    MAX_MODEL_NAME_LEN,
+    MAX_PROMPT_LEN,
+    OLLAMA_BASE_URL,
+)
 from conversation_store import ConversationStore
 
-# Path configurations
-AXON_DIR = Path.home() / ".axon"
 CONFIG_FILE = AXON_DIR / "config.toml"
-OLLAMA_BASE_URL = "http://localhost:11434"
 
 class BrainService(dbus.service.Object):
     def __init__(self):
@@ -137,8 +140,8 @@ class BrainService(dbus.service.Object):
     # Ollama tags: alnum start, then alnum plus . _ : / - (namespaced models
     # like "library/llama3" are allowed; ".." path traversal is not).
     _MODEL_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]*$")
-    _MAX_MODEL_NAME_LEN = 256
-    _MAX_PROMPT_LEN = 10000
+    _MAX_MODEL_NAME_LEN = MAX_MODEL_NAME_LEN
+    _MAX_PROMPT_LEN = MAX_PROMPT_LEN
 
     @staticmethod
     def _validate_model_name(name):

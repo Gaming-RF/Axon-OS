@@ -11,6 +11,7 @@ are spoken back through speech-dispatcher (spd-say) and shown as a
 desktop notification. Everything runs on-device.
 """
 
+import logging
 import os
 import shutil
 import signal
@@ -25,13 +26,18 @@ import dbus.mainloop.glib
 import dbus.service
 from gi.repository import GLib
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from constants import MAX_RECORD_SECONDS, WHISPER_DIR
+
+from axon_logger import configure_app_logger
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from intent_router import clean_transcript, parse_intent_response
 from vad_helper import is_speech_wav
 
+log = configure_app_logger("axon-voice", level=logging.INFO)
+
 WHISPER_MODEL = os.environ.get("AXON_WHISPER_MODEL", "base.en")
-WHISPER_DIR = Path.home() / ".axon" / "models" / "whisper"
-MAX_RECORD_SECONDS = 30
 
 
 class VoiceService(dbus.service.Object):
@@ -43,7 +49,7 @@ class VoiceService(dbus.service.Object):
                 "org.axonos.Voice", bus=self.session_bus
             )
         except dbus.exceptions.NameExistsException:
-            print("org.axonos.Voice service is already running.")
+            log.error("org.axonos.Voice service is already running.")
             sys.exit(1)
         dbus.service.Object.__init__(self, self.session_bus, "/org/axonos/Voice")
 
@@ -58,7 +64,7 @@ class VoiceService(dbus.service.Object):
         self._ambient_stop = threading.Event()
         # TTS engine cached choice (env var overrides)
         self._tts_engine = os.environ.get("AXON_TTS_ENGINE", "")
-        print("Axon Voice D-Bus service registered at /org/axonos/Voice")
+        log.info("Axon Voice D-Bus service registered at /org/axonos/Voice")
 
     # ------------------------------------------------------------------
     # D-Bus API
@@ -311,7 +317,7 @@ class VoiceService(dbus.service.Object):
                 self._overlay = VoiceOverlay()
             self._overlay.show(status)
         except Exception as exc:
-            print(f"[axon-voice] overlay unavailable: {exc}")
+            log.warning("overlay unavailable: %s", exc)
             self._overlay = None
 
     def _set_overlay_status(self, status):
@@ -336,7 +342,7 @@ class VoiceService(dbus.service.Object):
         `arecord` is not available.
         """
         if not shutil.which("arecord"):
-            print("[axon-voice] ambient disabled: 'arecord' not found")
+            log.warning("ambient disabled: 'arecord' not found")
             return
         while not self._ambient_stop.is_set():
             fd, wav = tempfile.mkstemp(prefix="axon-amb-", suffix=".wav")
@@ -365,7 +371,7 @@ class VoiceService(dbus.service.Object):
                     os.unlink(wav)
                 except Exception:
                     pass
-        print("[axon-voice] ambient stopped")
+        log.info("ambient stopped")
 
 
 if __name__ == "__main__":
