@@ -170,6 +170,9 @@ export default class AxonShellExtension extends Extension {
         this._dockManager   = null;
         this._keybindingIds = [];
         this._contextProxy  = null;
+        this._brainProxy    = null;
+        this._voiceProxy    = null;
+        this._voiceOverlayProc = null;
         this._focusWindowId = null;
         this._overlayKeyId  = null;
     }

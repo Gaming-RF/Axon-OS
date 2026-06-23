@@ -258,12 +258,11 @@ class SandboxManager(dbus.service.Object):
             dbus_ok("deny")
 
 if __name__ == '__main__':
-    # Initialize GTK Application context if not already created
+    # Initialize GTK before creating any GTK widgets
+    Gtk.init()
     loop = GLib.MainLoop()
     service = SandboxManager()
 
-    # We run in a standard GLib loop, GTK bindings require standard thread initialization
-    Gtk.init()
     try:
         loop.run()
     except KeyboardInterrupt:

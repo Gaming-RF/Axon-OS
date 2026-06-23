@@ -9,6 +9,7 @@ Provides a D-Bus interface (org.axonos.AdvancedVoice) with:
 """
 
 import json
+import logging
 import os
 import shutil
 import subprocess
@@ -29,7 +30,7 @@ from axon_logger import configure_app_logger
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from constants import WHISPER_DIR
 
-log = configure_app_logger("axon-advanced-voice", level=__import__("logging").INFO)
+log = configure_app_logger("axon-advanced-voice", level=logging.INFO)
 
 # Available STT engines
 ENGINES = {
