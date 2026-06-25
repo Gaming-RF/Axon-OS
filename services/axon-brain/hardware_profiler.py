@@ -11,14 +11,15 @@ logger = logging.getLogger(__name__)
 def get_system_ram():
     """Returns total system RAM in GB."""
     try:
-        with open('/proc/meminfo') as f:
+        with open("/proc/meminfo") as f:
             meminfo = f.read()
-        matched = re.search(r'MemTotal:\s+(\d+)\s+kB', meminfo)
+        matched = re.search(r"MemTotal:\s+(\d+)\s+kB", meminfo)
         if matched:
             return int(matched.group(1)) / (1024 * 1024)
     except Exception as e:
         logger.warning("Failed to read /proc/meminfo: %s — defaulting to 8 GB", e)
     return 8.0  # Default fallback
+
 
 def get_gpu_info():
     """
@@ -33,10 +34,10 @@ def get_gpu_info():
                 ["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader,nounits"],
                 capture_output=True,
                 text=True,
-                check=True
+                check=True,
             )
-            line = result.stdout.strip().split('\n')[0]
-            parts = [p.strip() for p in line.split(',')]
+            line = result.stdout.strip().split("\n")[0]
+            parts = [p.strip() for p in line.split(",")]
             if len(parts) >= 2:
                 name = parts[0]
                 vram_mb = float(parts[1])
@@ -44,7 +45,7 @@ def get_gpu_info():
                     "vendor": "NVIDIA",
                     "model": name,
                     "vram": vram_mb / 1024.0,
-                    "status": "detected"
+                    "status": "detected",
                 }
         except Exception as e:
             logger.debug("nvidia-smi detection failed: %s", e)
@@ -53,20 +54,17 @@ def get_gpu_info():
             # Try to get VRAM from rocm-smi
             # ROCm-smi output formats vary, we search for card info or usage
             result = subprocess.run(
-                ["rocm-smi", "--showmeminfo", "vram"],
-                capture_output=True,
-                text=True,
-                check=True
+                ["rocm-smi", "--showmeminfo", "vram"], capture_output=True, text=True, check=True
             )
             # Find lines like "VRAM Total Memory (B): 8589934592" or "VRAM Size: ... MB"
-            vram_bytes = re.search(r'VRAM Total Memory \(B\):\s+(\d+)', result.stdout)
+            vram_bytes = re.search(r"VRAM Total Memory \(B\):\s+(\d+)", result.stdout)
             if vram_bytes:
                 vram_gb = int(vram_bytes.group(1)) / (1024 * 1024 * 1024)
                 return {
                     "vendor": "AMD",
                     "model": "Radeon GPU (ROCm)",
                     "vram": vram_gb,
-                    "status": "detected"
+                    "status": "detected",
                 }
         except Exception as e:
             logger.debug("rocm-smi detection failed: %s", e)
@@ -76,20 +74,31 @@ def get_gpu_info():
         # Check lspci for VGA/3D controller
         lspci_out = subprocess.check_output(["lspci"], text=True)
         if "NVIDIA" in lspci_out:
-            return {"vendor": "NVIDIA", "model": "NVIDIA GPU (unconfigured)", "vram": 4.0, "status": "unsupported_driver"}
+            return {
+                "vendor": "NVIDIA",
+                "model": "NVIDIA GPU (unconfigured)",
+                "vram": 4.0,
+                "status": "unsupported_driver",
+            }
         elif "Advanced Micro Devices" in lspci_out or "ATI" in lspci_out:
-            return {"vendor": "AMD", "model": "AMD Radeon GPU (unconfigured)", "vram": 4.0, "status": "unsupported_driver"}
+            return {
+                "vendor": "AMD",
+                "model": "AMD Radeon GPU (unconfigured)",
+                "vram": 4.0,
+                "status": "unsupported_driver",
+            }
         elif "Intel" in lspci_out:
-            return {"vendor": "Intel", "model": "Intel Integrated Graphics", "vram": 2.0, "status": "cpu_shared"}
+            return {
+                "vendor": "Intel",
+                "model": "Intel Integrated Graphics",
+                "vram": 2.0,
+                "status": "cpu_shared",
+            }
     except Exception as e:
         logger.debug("lspci detection failed: %s", e)
 
-    return {
-        "vendor": "CPU",
-        "model": "Generic System CPU",
-        "vram": 0.0,
-        "status": "fallback"
-    }
+    return {"vendor": "CPU", "model": "Generic System CPU", "vram": 0.0, "status": "fallback"}
+
 
 def profile_hardware():
     ram = get_system_ram()
@@ -106,22 +115,22 @@ def profile_hardware():
             "gpu_vendor": gpu["vendor"],
             "gpu_model": gpu["model"],
             "gpu_vram_gb": round(gpu["vram"], 2) if gpu["vram"] > 0 else 0,
-            "status": gpu["status"]
+            "status": gpu["status"],
         },
         "recommendations": {
             "speed": {
                 "model": "llama3.2:1b",
-                "description": "Llama 3.2 1B — extremely fast, low memory usage, perfect for short command parsing and quick tasks."
+                "description": "Llama 3.2 1B — extremely fast, low memory usage, perfect for short command parsing and quick tasks.",
             },
             "general": {
                 "model": "llama3.2:3b",
-                "description": "Llama 3.2 3B — fast, private, well-suited for everyday chat, content summary, and ambient context."
+                "description": "Llama 3.2 3B — fast, private, well-suited for everyday chat, content summary, and ambient context.",
             },
             "deep": {
                 "model": "qwen2.5:7b",
-                "description": "Qwen 2.5 7B — high capability, great logic, ideal for code generation and deep reasoning."
-            }
-        }
+                "description": "Qwen 2.5 7B — high capability, great logic, ideal for code generation and deep reasoning.",
+            },
+        },
     }
 
     vram = gpu["vram"]
@@ -130,27 +139,27 @@ def profile_hardware():
         if vram >= 12.0:
             rec["recommendations"]["deep"] = {
                 "model": "qwen2.5:14b",
-                "description": "Qwen 2.5 14B — high intelligence, code-expert, runs fast on your 12GB+ GPU."
+                "description": "Qwen 2.5 14B — high intelligence, code-expert, runs fast on your 12GB+ GPU.",
             }
             rec["recommendations"]["general"] = {
                 "model": "qwen2.5:7b",
-                "description": "Qwen 2.5 7B — smart, fast general conversationalist with high context capabilities."
+                "description": "Qwen 2.5 7B — smart, fast general conversationalist with high context capabilities.",
             }
         elif vram >= 6.0:
             # 6GB-8GB VRAM (Sweet spot for 8B models)
             rec["recommendations"]["deep"] = {
                 "model": "llama3:8b",
-                "description": "Llama 3 8B — industry standard for deep reasoning, programming, and complex workflows."
+                "description": "Llama 3 8B — industry standard for deep reasoning, programming, and complex workflows.",
             }
         else:
             # Low VRAM GPU (<6GB)
             rec["recommendations"]["deep"] = {
                 "model": "llama3.2:3b",
-                "description": "Llama 3.2 3B — used as deep task model since GPU memory is limited."
+                "description": "Llama 3.2 3B — used as deep task model since GPU memory is limited.",
             }
             rec["recommendations"]["general"] = {
                 "model": "qwen2.5:1.5b",
-                "description": "Qwen 2.5 1.5B — fast, medium capacity, handles lightweight panel chats on low VRAM."
+                "description": "Qwen 2.5 1.5B — fast, medium capacity, handles lightweight panel chats on low VRAM.",
             }
     else:
         # CPU or Integrated GPU fallback
@@ -158,22 +167,24 @@ def profile_hardware():
         if ram >= 16.0:
             rec["recommendations"]["deep"] = {
                 "model": "llama3:8b",
-                "description": "Llama 3 8B — high reasoning, runs on CPU RAM (will have moderate response latency)."
+                "description": "Llama 3 8B — high reasoning, runs on CPU RAM (will have moderate response latency).",
             }
         else:
             rec["recommendations"]["deep"] = {
                 "model": "llama3.2:3b",
-                "description": "Llama 3.2 3B — balanced CPU fallback."
+                "description": "Llama 3.2 3B — balanced CPU fallback.",
             }
             rec["recommendations"]["general"] = {
                 "model": "qwen2.5:1.5b",
-                "description": "Qwen 2.5 1.5B — fast response on standard system RAM."
+                "description": "Qwen 2.5 1.5B — fast response on standard system RAM.",
             }
 
     return rec
 
+
 if __name__ == "__main__":
     profile = profile_hardware()
     from axon_logger import configure_app_logger
+
     logger = configure_app_logger(__name__)
     logger.debug(json.dumps(profile, indent=2))

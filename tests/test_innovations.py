@@ -232,8 +232,12 @@ from unittest.mock import MagicMock
 # back to mocks on a bare interpreter. Unconditionally overwriting sys.modules
 # here would poison D-Bus for every other test in the session.
 for _mod in (
-    "dbus", "dbus.mainloop", "dbus.mainloop.glib", "dbus.service",
-    "gi", "gi.repository",
+    "dbus",
+    "dbus.mainloop",
+    "dbus.mainloop.glib",
+    "dbus.service",
+    "gi",
+    "gi.repository",
 ):
     if _mod not in sys.modules:
         try:

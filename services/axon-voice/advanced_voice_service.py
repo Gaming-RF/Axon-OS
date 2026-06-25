@@ -9,6 +9,7 @@ Provides a D-Bus interface (org.axonos.AdvancedVoice) with:
 """
 
 import json
+import logging
 import os
 import shutil
 import subprocess
@@ -29,7 +30,7 @@ from axon_logger import configure_app_logger
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from constants import WHISPER_DIR
 
-log = configure_app_logger("axon-advanced-voice", level=__import__("logging").INFO)
+log = configure_app_logger("axon-advanced-voice", level=logging.INFO)
 
 # Available STT engines
 ENGINES = {
@@ -61,9 +62,7 @@ class AdvancedVoiceService(dbus.service.Object):
         dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
         self.session_bus = dbus.SessionBus()
         try:
-            self.bus_name = dbus.service.BusName(
-                "org.axonos.AdvancedVoice", bus=self.session_bus
-            )
+            self.bus_name = dbus.service.BusName("org.axonos.AdvancedVoice", bus=self.session_bus)
         except dbus.exceptions.NameExistsException:
             log.error("org.axonos.AdvancedVoice service is already running.")
             sys.exit(1)
@@ -100,16 +99,18 @@ class AdvancedVoiceService(dbus.service.Object):
         if shutil.which("spd-say"):
             available_engines.append("speech-dispatcher")
 
-        return json.dumps({
-            "listening": self._listening,
-            "busy": self._busy,
-            "engine": self._engine,
-            "available_engines": available_engines,
-            "language": self._language,
-            "language_name": LANGUAGES.get(self._language, self._language),
-            "wake_enabled": self._wake_enabled,
-            "audio_level": round(self._audio_level, 3),
-        })
+        return json.dumps(
+            {
+                "listening": self._listening,
+                "busy": self._busy,
+                "engine": self._engine,
+                "available_engines": available_engines,
+                "language": self._language,
+                "language_name": LANGUAGES.get(self._language, self._language),
+                "wake_enabled": self._wake_enabled,
+                "audio_level": round(self._audio_level, 3),
+            }
+        )
 
     @dbus.service.method("org.axonos.AdvancedVoice", out_signature="s")
     def ListEngines(self):
@@ -192,7 +193,9 @@ class AdvancedVoiceService(dbus.service.Object):
         if not text or not shutil.which("spd-say"):
             return False
         try:
-            subprocess.Popen(["spd-say", text], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.Popen(
+                ["spd-say", text], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            )
             return True
         except Exception:
             return False
@@ -228,13 +231,24 @@ class AdvancedVoiceService(dbus.service.Object):
     def _recorder_command(self, wav_path):
         if shutil.which("parecord"):
             return [
-                "parecord", "--rate=16000", "--channels=1",
-                "--format=s16le", "--file-format=wav", wav_path,
+                "parecord",
+                "--rate=16000",
+                "--channels=1",
+                "--format=s16le",
+                "--file-format=wav",
+                wav_path,
             ]
         if shutil.which("arecord"):
             return [
-                "arecord", "-q", "-f", "S16_LE", "-r", "16000",
-                "-c", "1", wav_path,
+                "arecord",
+                "-q",
+                "-f",
+                "S16_LE",
+                "-r",
+                "16000",
+                "-c",
+                "1",
+                wav_path,
             ]
         return None
 
@@ -248,7 +262,9 @@ class AdvancedVoiceService(dbus.service.Object):
             self.StateChanged("error")
             return
         try:
-            self._recorder = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            self._recorder = subprocess.Popen(
+                cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            )
             # Audio level monitor
             threading.Thread(target=self._monitor_audio, daemon=True).start()
         except Exception as e:
@@ -258,21 +274,24 @@ class AdvancedVoiceService(dbus.service.Object):
             self.StateChanged("error")
 
     def _stop_and_transcribe(self):
-        if self._recorder:
-            try:
-                self._recorder.terminate()
-                self._recorder.wait(timeout=5)
-            except Exception:
-                self._recorder.kill()
+        with self._lock:
+            rec = self._recorder
             self._recorder = None
-
-        if self._wav_path and Path(self._wav_path).exists():
-            result = self._transcribe_file(self._wav_path)
+            wav_path = self._wav_path
+            self._wav_path = None
+        if rec:
             try:
-                os.unlink(self._wav_path)
+                rec.terminate()
+                rec.wait(timeout=5)
+            except Exception:
+                rec.kill()
+
+        if wav_path and Path(wav_path).exists():
+            result = self._transcribe_file(wav_path)
+            try:
+                os.unlink(wav_path)
             except OSError:
                 pass
-            self._wav_path = None
             self._busy = False
             self.TranscriptReady(result)
         else:
@@ -282,21 +301,21 @@ class AdvancedVoiceService(dbus.service.Object):
     def _monitor_audio(self):
         """Monitor audio levels during recording."""
         while self._listening and self._recorder:
+            wav_path = self._wav_path
+            if not wav_path or not Path(wav_path).exists():
+                break
             try:
-                # Read a small chunk and compute RMS
                 import wave
-                if self._wav_path and Path(self._wav_path).exists():
-                    try:
-                        with wave.open(self._wav_path, "rb") as wf:
-                            frames = wf.readframes(min(1600, wf.getnframes()))
-                            if frames:
-                                import struct
-                                samples = struct.unpack(f"<{len(frames)//2}h", frames)
-                                rms = (sum(s**2 for s in samples) / max(len(samples), 1)) ** 0.5
-                                self._audio_level = min(rms / 32768.0, 1.0)
-                                self.AudioLevel(self._audio_level)
-                    except Exception:
-                        pass
+
+                with wave.open(wav_path, "rb") as wf:
+                    frames = wf.readframes(min(1600, wf.getnframes()))
+                    if frames:
+                        import struct
+
+                        samples = struct.unpack(f"<{len(frames) // 2}h", frames)
+                        rms = (sum(s**2 for s in samples) / max(len(samples), 1)) ** 0.5
+                        self._audio_level = min(rms / 32768.0, 1.0)
+                        self.AudioLevel(self._audio_level)
             except Exception:
                 pass
             time.sleep(0.1)
@@ -318,18 +337,17 @@ class AdvancedVoiceService(dbus.service.Object):
         """Transcribe using faster-whisper (local model)."""
         try:
             from faster_whisper import WhisperModel
+
             if self._whisper_model is None:
                 model_size = os.environ.get("AXON_WHISPER_MODEL", "base.en")
-                self._whisper_model = WhisperModel(
-                    model_size, device="cpu", compute_type="int8"
-                )
-            segments, info = self._whisper_model.transcribe(
-                file_path, language=self._language
-            )
+                self._whisper_model = WhisperModel(model_size, device="cpu", compute_type="int8")
+            segments, info = self._whisper_model.transcribe(file_path, language=self._language)
             text = " ".join(segment.text for segment in segments).strip()
             log.info(
                 "Whisper transcribed (%s, %.1fs): %s",
-                info.language, info.duration, text[:80],
+                info.language,
+                info.duration,
+                text[:80],
             )
             return text
         except ImportError:
@@ -374,7 +392,9 @@ class AdvancedVoiceService(dbus.service.Object):
         try:
             result = subprocess.run(
                 ["whisper", file_path, "--language", self._language, "--output_format", "txt"],
-                capture_output=True, text=True, timeout=30,
+                capture_output=True,
+                text=True,
+                timeout=30,
             )
             txt_file = Path(file_path).with_suffix(".txt")
             if txt_file.exists():

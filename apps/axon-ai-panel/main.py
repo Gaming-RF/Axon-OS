@@ -49,9 +49,7 @@ class AIPanelApp(Adw.Application):
 
     # ------------------------------------------------------------------
 
-    def _on_toggle_action(
-        self, action: Gio.SimpleAction, param: None
-    ) -> None:
+    def _on_toggle_action(self, action: Gio.SimpleAction, param: None) -> None:
         if self._window is not None:
             self._window.toggle()
 

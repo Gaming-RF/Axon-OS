@@ -14,15 +14,18 @@ import sqlite_vec
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 try:
     from axon_logger import configure_app_logger
+
     logger = configure_app_logger(__name__)
 except ImportError:
     import logging
+
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger("axon-file-indexer")
 
 from constants import AXON_DIR
 
 DB_PATH = AXON_DIR / "semantic_search.db"
+
 
 class FileIndexer:
     def __init__(self):
@@ -36,11 +39,8 @@ class FileIndexer:
         self.watch_dirs = [
             Path.home() / "Documents",
             Path.home() / "Notes",
-            Path.home() / "Projects"
+            Path.home() / "Projects",
         ]
-
-        for d in self.watch_dirs:
-            d.mkdir(parents=True, exist_ok=True)
 
         logger.info(f"File Indexer initialized. Monitoring: {[str(d) for d in self.watch_dirs]}")
 
@@ -65,8 +65,8 @@ class FileIndexer:
 
     def get_brain_embedding(self, text):
         try:
-            brain_obj = self.session_bus.get_object('org.axonos.Brain', '/org/axonos/Brain')
-            brain_interface = dbus.Interface(brain_obj, 'org.axonos.Brain')
+            brain_obj = self.session_bus.get_object("org.axonos.Brain", "/org/axonos/Brain")
+            brain_interface = dbus.Interface(brain_obj, "org.axonos.Brain")
             # Use general model or default for embedding
             emb_json = brain_interface.GetEmbeddings(text, "")
             emb = json.loads(emb_json)
@@ -110,16 +110,25 @@ class FileIndexer:
                 logger.warning(f"Could not generate embedding for {p}")
                 return
 
-            emb_bytes = array('f', emb).tobytes()
+            emb_bytes = array("f", emb).tobytes()
 
             if row:
                 doc_id = row[0]
-                cursor.execute("UPDATE files SET mtime = ?, content = ? WHERE id = ?", (mtime, chunk, doc_id))
-                cursor.execute("UPDATE vec_items SET embedding = ? WHERE rowid = ?", (emb_bytes, doc_id))
+                cursor.execute(
+                    "UPDATE files SET mtime = ?, content = ? WHERE id = ?", (mtime, chunk, doc_id)
+                )
+                cursor.execute(
+                    "UPDATE vec_items SET embedding = ? WHERE rowid = ?", (emb_bytes, doc_id)
+                )
             else:
-                cursor.execute("INSERT INTO files (path, mtime, content) VALUES (?, ?, ?)", (str(p), mtime, chunk))
+                cursor.execute(
+                    "INSERT INTO files (path, mtime, content) VALUES (?, ?, ?)",
+                    (str(p), mtime, chunk),
+                )
                 doc_id = cursor.lastrowid
-                cursor.execute("INSERT INTO vec_items (rowid, embedding) VALUES (?, ?)", (doc_id, emb_bytes))
+                cursor.execute(
+                    "INSERT INTO vec_items (rowid, embedding) VALUES (?, ?)", (doc_id, emb_bytes)
+                )
 
             self.conn.commit()
             logger.info(f"Successfully indexed: {p}")
@@ -165,7 +174,8 @@ class FileIndexer:
                 logger.error(f"Error in index loop: {e}")
             time.sleep(30)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     indexer = FileIndexer()
     logger.info("Starting background file scan loop...")
     indexer.run_loop()

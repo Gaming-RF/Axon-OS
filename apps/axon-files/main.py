@@ -19,10 +19,13 @@ from ui import FilesWindow
 class FilesApp(Adw.Application):
     def __init__(self):
         super().__init__(application_id="org.axonos.Files")
+        self._window = None
 
     def do_activate(self):
-        win = FilesWindow(self)
-        win.present()
+        if self._window is None:
+            self._window = FilesWindow(self)
+        self._window.present()
+
 
 app = FilesApp()
 

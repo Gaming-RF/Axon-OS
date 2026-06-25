@@ -55,9 +55,7 @@ except ImportError:
         def list_models(self) -> list[str]:
             """Return list of locally available model names."""
             try:
-                with urllib.request.urlopen(
-                    f"{self.BASE_URL}/api/tags", timeout=5
-                ) as resp:
+                with urllib.request.urlopen(f"{self.BASE_URL}/api/tags", timeout=5) as resp:
                     data = json.loads(resp.read().decode())
                     return [m["name"] for m in data.get("models", [])]
             except Exception:
@@ -91,9 +89,8 @@ except ImportError:
                             continue
                         try:
                             obj = json.loads(line)
-                            chunk = (
-                                obj.get("message", {}).get("content", "")
-                                or obj.get("response", "")
+                            chunk = obj.get("message", {}).get("content", "") or obj.get(
+                                "response", ""
                             )
                             if chunk:
                                 yield chunk
@@ -108,6 +105,7 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # MessageBubble
 # ---------------------------------------------------------------------------
+
 
 class MessageBubble(Gtk.Box):
     """A single chat message displayed as a styled bubble with a copy button."""
@@ -194,6 +192,7 @@ class MessageBubble(Gtk.Box):
 # Markup rendering
 # ---------------------------------------------------------------------------
 
+
 def _apply_markup(text: str) -> str:
     """Convert a subset of Markdown-like markup to Pango markup."""
     # 1. Escape HTML special characters first
@@ -220,6 +219,7 @@ def _apply_markup(text: str) -> str:
 # ---------------------------------------------------------------------------
 # AIPanelWindow
 # ---------------------------------------------------------------------------
+
 
 class AIPanelWindow(Adw.Window):
     """Main side-panel window for the Axon AI assistant."""

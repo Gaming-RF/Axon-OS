@@ -81,8 +81,7 @@ def vec_table_ready(db, dim=None):
         return False
     try:
         db.execute(
-            f"CREATE VIRTUAL TABLE IF NOT EXISTS vec_chunks"
-            f" USING vec0(embedding float[{int(dim)}])"
+            f"CREATE VIRTUAL TABLE IF NOT EXISTS vec_chunks USING vec0(embedding float[{int(dim)}])"
         )
         db.execute(
             "INSERT OR REPLACE INTO meta(key, value) VALUES ('vec_dim', ?)",
@@ -175,13 +174,14 @@ class SearchService(dbus.service.Object):
                 def __init__(self, service):
                     self.service = service
                     self.debounce_timer = None
+                    self._timer_lock = threading.Lock()
 
                 def on_any_event(self, event):
                     if event.is_directory:
                         return
 
                     paths_to_check = []
-                    if hasattr(event, 'dest_path'):
+                    if hasattr(event, "dest_path"):
                         paths_to_check.append(event.dest_path)
                     if event.src_path:
                         paths_to_check.append(event.src_path)
@@ -190,7 +190,10 @@ class SearchService(dbus.service.Object):
                     for p in paths_to_check:
                         p_path = Path(p)
                         if p_path.suffix.lower() in indexer.INDEX_EXTENSIONS:
-                            if not any(part in indexer.EXCLUDE_DIRS or part.startswith(".") for part in p_path.parts[:-1]):
+                            if not any(
+                                part in indexer.EXCLUDE_DIRS or part.startswith(".")
+                                for part in p_path.parts[:-1]
+                            ):
                                 should_trigger = True
                                 break
 
@@ -198,10 +201,11 @@ class SearchService(dbus.service.Object):
                         self.trigger_rescan()
 
                 def trigger_rescan(self):
-                    if self.debounce_timer:
-                        self.debounce_timer.cancel()
-                    self.debounce_timer = threading.Timer(2.0, self._set_event)
-                    self.debounce_timer.start()
+                    with self._timer_lock:
+                        if self.debounce_timer:
+                            self.debounce_timer.cancel()
+                        self.debounce_timer = threading.Timer(2.0, self._set_event)
+                        self.debounce_timer.start()
 
                 def _set_event(self):
                     self.service._rescan_event.set()
@@ -319,7 +323,7 @@ class SearchService(dbus.service.Object):
         self._delete_file(db, path)
         for idx, chunk in enumerate(indexer.chunk_text(text)):
             cur = db.execute(
-                "INSERT INTO chunks(path, mtime, chunk_idx, text)" " VALUES (?,?,?,?)",
+                "INSERT INTO chunks(path, mtime, chunk_idx, text) VALUES (?,?,?,?)",
                 (path, mtime, idx, chunk),
             )
             cid = cur.lastrowid

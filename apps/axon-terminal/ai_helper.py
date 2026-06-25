@@ -35,6 +35,7 @@ except ImportError:  # running standalone — repo root / installed shim not on 
             _logging.basicConfig(level=level)
             return _logging.getLogger(name)
 
+
 logger = configure_app_logger(__name__)
 
 
@@ -194,7 +195,7 @@ class AIHelper:
     ) -> None:
         prompt = (
             f"Convert this request into a single Linux shell command:\n"
-            f"\"{natural_language}\"\n\n"
+            f'"{natural_language}"\n\n'
             "Reply with ONLY the command — no explanation, no markdown, no backticks. "
             "If the request is ambiguous, pick the most common interpretation."
         )
@@ -254,7 +255,7 @@ class AIHelper:
             f"Error output:\n```\n{stderr_output[:1500]}\n```\n\n"
             "Suggest 1-3 corrected or alternative commands that would fix or "
             "work around this error. Reply ONLY as a JSON array of command "
-            "strings, e.g. [\"cmd1\", \"cmd2\"]. No other text."
+            'strings, e.g. ["cmd1", "cmd2"]. No other text.'
         )
         context = self._get_context_string()
         try:

@@ -9,6 +9,7 @@ Layout produced by create_partitions():
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 from dataclasses import dataclass, field
 
@@ -24,7 +25,12 @@ except ImportError:  # running standalone — repo root / installed shim not on 
     except ImportError:
         import logging as _logging
 
-        def configure_app_logger(name, level=_logging.INFO, log_file=None):
+        def configure_app_logger(
+            name: str,
+            level: int = _logging.INFO,
+            log_file: str | None = None,
+            json_output: bool = False,
+        ) -> _logging.Logger:
             _logging.basicConfig(level=level)
             return _logging.getLogger(name)
 
@@ -32,26 +38,27 @@ except ImportError:  # running standalone — repo root / installed shim not on 
 # Data classes
 # ---------------------------------------------------------------------------
 
-@dataclass
 
+@dataclass
 class PartitionInfo:
-    num:    int
-    name:   str
-    size:   str
+    num: int
+    name: str
+    size: str
     fstype: str | None = None
 
 
 @dataclass
 class DiskInfo:
-    device:     str
-    size:       str
-    model:      str | None
+    device: str
+    size: str
+    model: str | None
     partitions: list[PartitionInfo] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
 # Partitioner
 # ---------------------------------------------------------------------------
+
 
 class Partitioner:
     """Wrapper around parted / mkfs utilities for Axon OS installation."""
@@ -101,8 +108,7 @@ class Partitioner:
             for i, child in enumerate(device.get("children", [])):
                 # Deduce partition number from name (e.g. sda1 -> 1, nvme0n1p12 -> 12)
                 p_name = child.get("name", "")
-                import re
-                m = re.search(r'(\\d+)$', p_name)
+                m = re.search(r"(\d+)$", p_name)
                 p_num = int(m.group(1)) if m else (i + 1)
 
                 partitions.append(
@@ -131,16 +137,30 @@ class Partitioner:
             if self.dry_run:
                 # Return dummy partition map for dry run
                 return [
-                    {"num": 1, "start": 1.0, "end": 513.0, "size": 512.0, "fstype": "vfat", "name": "EFI"},
-                    {"num": 2, "start": 513.0, "end": 102400.0, "size": 101887.0, "fstype": "ext4", "name": "root"}
+                    {
+                        "num": 1,
+                        "start": 1.0,
+                        "end": 513.0,
+                        "size": 512.0,
+                        "fstype": "vfat",
+                        "name": "EFI",
+                    },
+                    {
+                        "num": 2,
+                        "start": 513.0,
+                        "end": 102400.0,
+                        "size": 101887.0,
+                        "fstype": "ext4",
+                        "name": "root",
+                    },
                 ]
             result = self._run(["parted", "-m", device, "unit", "MiB", "print"])
-            lines = result.stdout.strip().split('\n')
+            lines = result.stdout.strip().split("\n")
             partitions = []
             for line in lines:
                 if not line or line.startswith("BYT;") or line.startswith("/dev/"):
                     continue
-                parts = line.split(':')
+                parts = line.split(":")
                 if len(parts) >= 6:
                     num = int(parts[0])
                     start = float(parts[1].replace("MiB", ""))
@@ -148,14 +168,16 @@ class Partitioner:
                     size = float(parts[3].replace("MiB", ""))
                     fstype = parts[4]
                     name = parts[5]
-                    partitions.append({
-                        "num": num,
-                        "start": start,
-                        "end": end,
-                        "size": size,
-                        "fstype": fstype,
-                        "name": name
-                    })
+                    partitions.append(
+                        {
+                            "num": num,
+                            "start": start,
+                            "end": end,
+                            "size": size,
+                            "fstype": fstype,
+                            "name": name,
+                        }
+                    )
             return partitions
         except Exception:
             return []
@@ -179,7 +201,9 @@ class Partitioner:
             logger.error("Partitioning failed: %s", exc.stderr)
             return False
 
-    def partition_alongside(self, device: str, partition_num: int, shrink_size_gb: int) -> int | None:
+    def partition_alongside(
+        self, device: str, partition_num: int, shrink_size_gb: int
+    ) -> int | None:
         """Shrinks partition_num by shrink_size_gb and creates a new root partition in the freed space.
 
         Returns the partition number of the newly created root partition on success, or None on failure.
@@ -196,7 +220,7 @@ class Partitioner:
             shrink_size_mib = shrink_size_gb * 1024
             original_size_mib = target["size"]
             new_size_mib = original_size_mib - shrink_size_mib
-            if new_size_mib < 10240: # Leave at least 10 GB
+            if new_size_mib < 10240:  # Leave at least 10 GB
                 logger.warning("Cannot shrink partition %s below 10GB", partition_num)
                 return None
 
@@ -211,16 +235,20 @@ class Partitioner:
             elif target["fstype"] in ("ntfs", "fuseblk"):
                 self._run(["ntfsresize", "-y", "--size", f"{int(new_size_mib)}M", part_path])
             else:
-                logger.error("Unsupported filesystem type: %s", target['fstype'])
+                logger.error("Unsupported filesystem type: %s", target["fstype"])
                 return None
 
             # Step 2: Shrink the partition itself
             new_end_mib = target["start"] + new_size_mib
-            self._run(["parted", "-s", device, "resizepart", str(partition_num), f"{new_end_mib}MiB"])
+            self._run(
+                ["parted", "-s", device, "resizepart", str(partition_num), f"{new_end_mib}MiB"]
+            )
 
             # Step 3: Create new root partition in the freed space
             # Start from the new end of the shrunk partition, end at 100% of the disk
-            self._run(["parted", "-s", device, "mkpart", "root", "btrfs", f"{new_end_mib}MiB", "100%"])
+            self._run(
+                ["parted", "-s", device, "mkpart", "root", "btrfs", f"{new_end_mib}MiB", "100%"]
+            )
 
             # Find new partition number (typically pmap count + 1)
             # Fetch the updated partition map to confirm number
@@ -241,18 +269,34 @@ class Partitioner:
         self._run(["parted", "-s", device, "mklabel", "gpt"])
 
         # EFI System Partition
-        self._run([
-            "parted", "-s", device,
-            "mkpart", "EFI", "fat32", "1MiB", "513MiB",
-        ])
+        self._run(
+            [
+                "parted",
+                "-s",
+                device,
+                "mkpart",
+                "EFI",
+                "fat32",
+                "1MiB",
+                "513MiB",
+            ]
+        )
         self._run(["parted", "-s", device, "set", "1", "esp", "on"])
         self._run(["parted", "-s", device, "set", "1", "boot", "on"])
 
         # Root partition
-        self._run([
-            "parted", "-s", device,
-            "mkpart", "root", "btrfs", "513MiB", "100%",
-        ])
+        self._run(
+            [
+                "parted",
+                "-s",
+                device,
+                "mkpart",
+                "root",
+                "btrfs",
+                "513MiB",
+                "100%",
+            ]
+        )
 
     def format_partitions(self, device: str) -> None:
         """Format the two partitions created by :meth:`create_partitions`.
@@ -260,7 +304,7 @@ class Partitioner:
         Assumes the kernel has updated the partition table (or that
         ``partprobe`` / ``udevadm settle`` was called beforehand).
         """
-        efi_part  = f"{device}p1" if device[-1].isdigit() else f"{device}1"
+        efi_part = f"{device}p1" if device[-1].isdigit() else f"{device}1"
         root_part = f"{device}p2" if device[-1].isdigit() else f"{device}2"
 
         # EFI — FAT32
@@ -271,7 +315,11 @@ class Partitioner:
 
     def format_partitions_alongside(self, device: str, root_partition_num: int) -> None:
         """Format only the newly created alongside root partition."""
-        root_part = f"{device}p{root_partition_num}" if device[-1].isdigit() else f"{device}{root_partition_num}"
+        root_part = (
+            f"{device}p{root_partition_num}"
+            if device[-1].isdigit()
+            else f"{device}{root_partition_num}"
+        )
         self._run(["mkfs.btrfs", "-f", root_part])
 
     def mount_partitions(self, device: str, mount_point: str) -> None:
@@ -279,7 +327,7 @@ class Partitioner:
 
         Creates ``<mount_point>/boot/efi`` if it does not exist.
         """
-        efi_part  = f"{device}p1" if device[-1].isdigit() else f"{device}1"
+        efi_part = f"{device}p1" if device[-1].isdigit() else f"{device}1"
         root_part = f"{device}p2" if device[-1].isdigit() else f"{device}2"
 
         import os
@@ -304,10 +352,20 @@ class Partitioner:
         self._run(["mkdir", "-p", efi_mount])
         self._run(["mount", efi_part, efi_mount])
 
-    def mount_partitions_alongside(self, device: str, efi_partition_num: int, root_partition_num: int, mount_point: str) -> None:
+    def mount_partitions_alongside(
+        self, device: str, efi_partition_num: int, root_partition_num: int, mount_point: str
+    ) -> None:
         """Mount root partition and existing EFI partition for dual-boot environment."""
-        efi_part  = f"{device}p{efi_partition_num}" if device[-1].isdigit() else f"{device}{efi_partition_num}"
-        root_part = f"{device}p{root_partition_num}" if device[-1].isdigit() else f"{device}{root_partition_num}"
+        efi_part = (
+            f"{device}p{efi_partition_num}"
+            if device[-1].isdigit()
+            else f"{device}{efi_partition_num}"
+        )
+        root_part = (
+            f"{device}p{root_partition_num}"
+            if device[-1].isdigit()
+            else f"{device}{root_partition_num}"
+        )
 
         import os
         import tempfile

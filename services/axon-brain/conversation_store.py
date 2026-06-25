@@ -33,8 +33,15 @@ class ConversationStore:
         conn.execute("PRAGMA foreign_keys = ON")
         return conn
 
+    def _close_connection(self, conn):
+        try:
+            conn.close()
+        except Exception:
+            pass
+
     def _init_db(self):
-        with self._get_connection() as conn:
+        conn = self._get_connection()
+        try:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS conversations (
                     id TEXT PRIMARY KEY,
@@ -56,8 +63,12 @@ class ConversationStore:
                 )
             """)
 
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id)")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id)"
+            )
             conn.commit()
+        finally:
+            self._close_connection(conn)
 
     def create_conversation(self, system_prompt=None, title=None, conv_id=None):
         if not conv_id:
@@ -66,74 +77,103 @@ class ConversationStore:
             title = f"New Chat ({datetime.now().strftime('%Y-%m-%d %H:%M')})"
 
         with self._lock:
-            with self._get_connection() as conn:
+            conn = self._get_connection()
+            try:
                 conn.execute(
                     "INSERT INTO conversations (id, title, system_prompt) VALUES (?, ?, ?)",
-                    (conv_id, title, system_prompt)
+                    (conv_id, title, system_prompt),
                 )
                 conn.commit()
+            finally:
+                self._close_connection(conn)
         return conv_id
 
     def add_message(self, conversation_id, role, content):
         with self._lock:
-            with self._get_connection() as conn:
-                cursor = conn.execute("SELECT 1 FROM conversations WHERE id = ?", (conversation_id,))
+            conn = self._get_connection()
+            try:
+                cursor = conn.execute(
+                    "SELECT 1 FROM conversations WHERE id = ?", (conversation_id,)
+                )
                 if not cursor.fetchone():
                     conn.execute(
                         "INSERT INTO conversations (id, title) VALUES (?, ?)",
-                        (conversation_id, f"New Chat ({datetime.now().strftime('%Y-%m-%d %H:%M')})")
+                        (
+                            conversation_id,
+                            f"New Chat ({datetime.now().strftime('%Y-%m-%d %H:%M')})",
+                        ),
                     )
 
                 conn.execute(
                     "INSERT INTO messages (conversation_id, role, content) VALUES (?, ?, ?)",
-                    (conversation_id, role, content)
+                    (conversation_id, role, content),
                 )
                 conn.execute(
                     "UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                    (conversation_id,)
+                    (conversation_id,),
                 )
                 conn.commit()
+            finally:
+                self._close_connection(conn)
 
     def get_messages(self, conversation_id):
         with self._lock:
-            with self._get_connection() as conn:
+            conn = self._get_connection()
+            try:
                 cursor = conn.execute(
                     "SELECT role, content, timestamp FROM messages WHERE conversation_id = ? ORDER BY id ASC",
-                    (conversation_id,)
+                    (conversation_id,),
                 )
                 return [dict(row) for row in cursor.fetchall()]
+            finally:
+                self._close_connection(conn)
 
     def list_conversations(self):
         with self._lock:
-            with self._get_connection() as conn:
+            conn = self._get_connection()
+            try:
                 cursor = conn.execute(
                     "SELECT id, title, system_prompt, created_at, updated_at FROM conversations ORDER BY updated_at DESC"
                 )
                 return [dict(row) for row in cursor.fetchall()]
+            finally:
+                self._close_connection(conn)
 
     def delete_conversation(self, conversation_id):
         with self._lock:
-            with self._get_connection() as conn:
+            conn = self._get_connection()
+            try:
                 conn.execute("DELETE FROM conversations WHERE id = ?", (conversation_id,))
                 conn.commit()
+            finally:
+                self._close_connection(conn)
 
     def update_title(self, conversation_id, title):
         with self._lock:
-            with self._get_connection() as conn:
+            conn = self._get_connection()
+            try:
                 conn.execute(
                     "UPDATE conversations SET title = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                    (title, conversation_id)
+                    (title, conversation_id),
                 )
                 conn.commit()
+            finally:
+                self._close_connection(conn)
 
     def search_messages(self, query):
         with self._lock:
-            with self._get_connection() as conn:
-                cursor = conn.execute("""
+            conn = self._get_connection()
+            try:
+                cursor = conn.execute(
+                    """
                     SELECT m.conversation_id, c.title as conversation_title, m.role, m.content, m.timestamp
                     FROM messages m
                     JOIN conversations c ON m.conversation_id = c.id
                     WHERE m.content LIKE ?
                     ORDER BY m.timestamp DESC
-                """, (f"%{query}%",))
+                """,
+                    (f"%{query}%",),
+                )
                 return [dict(row) for row in cursor.fetchall()]
+            finally:
+                self._close_connection(conn)

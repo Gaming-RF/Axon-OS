@@ -11,6 +11,7 @@ Integrates with hardware_profiler for resource-aware decisions.
 
 import re
 import sys
+import threading
 from pathlib import Path
 
 try:
@@ -22,9 +23,15 @@ except ImportError:
     except ImportError:
         import logging as _logging
 
-        def configure_app_logger(name, level=_logging.INFO, log_file=None):
+        def configure_app_logger(
+            name: str,
+            level: int = _logging.INFO,
+            log_file: str | None = None,
+            json_output: bool = False,
+        ) -> _logging.Logger:
             _logging.basicConfig(level=level)
             return _logging.getLogger(name)
+
 
 log = configure_app_logger("ai-router")
 
@@ -56,8 +63,16 @@ _CODE_PATTERNS = [
 ]
 
 _EMBEDDING_KEYWORDS = {
-    "search", "find", "locate", "index", "embed", "vector", "similar",
-    "semantic", "relevant", "matching",
+    "search",
+    "find",
+    "locate",
+    "index",
+    "embed",
+    "vector",
+    "similar",
+    "semantic",
+    "relevant",
+    "matching",
 }
 
 
@@ -76,12 +91,12 @@ class AIRouter:
     DEEP = "deep"
     EMBEDDING = "embedding"
 
-    def __init__(self, config: dict | None = None) -> None:
-        self._config = config or {}
-        self._speed_model = self._config.get("speed_model", "llama3.2:3b")
-        self._general_model = self._config.get("general_model", "mistral:7b")
-        self._deep_model = self._config.get("deep_model", "qwen2.5:7b")
-        self._embed_model = "nomic-embed-text"
+    def __init__(self, config: dict[str, str] | None = None) -> None:
+        self._config: dict[str, str] = config or {}
+        self._speed_model: str = self._config.get("speed_model", "llama3.2:3b")
+        self._general_model: str = self._config.get("general_model", "mistral:7b")
+        self._deep_model: str = self._config.get("deep_model", "qwen2.5:7b")
+        self._embed_model: str = "nomic-embed-text"
 
     def select_model(
         self,
@@ -126,9 +141,7 @@ class AIRouter:
             return self.EMBEDDING
 
         # Check for code patterns (before speed to avoid false positives)
-        code_score = sum(
-            1 for p in _CODE_PATTERNS if re.search(p, text, re.IGNORECASE)
-        )
+        code_score = sum(1 for p in _CODE_PATTERNS if re.search(p, text, re.IGNORECASE))
         if code_score >= 1 and len(text.split()) > 5:
             return self.DEEP
 
@@ -138,9 +151,7 @@ class AIRouter:
                 return self.SPEED
 
         # Check for general patterns
-        general_score = sum(
-            1 for p in _GENERAL_PATTERNS if re.search(p, text, re.IGNORECASE)
-        )
+        general_score = sum(1 for p in _GENERAL_PATTERNS if re.search(p, text, re.IGNORECASE))
         if general_score >= 1:
             return self.GENERAL
 
@@ -187,11 +198,14 @@ class AIRouter:
 
 # Singleton
 _router: AIRouter | None = None
+_router_lock = threading.Lock()
 
 
 def get_router(config: dict | None = None) -> AIRouter:
-    """Get or create the singleton AIRouter."""
+    """Get or create the singleton AIRouter (thread-safe)."""
     global _router
     if _router is None:
-        _router = AIRouter(config)
+        with _router_lock:
+            if _router is None:
+                _router = AIRouter(config)
     return _router

@@ -47,6 +47,7 @@ def ai_audit(script_text: str) -> str:
     """One-paragraph AI verdict via the Brain service; "" when unavailable."""
     try:
         import dbus
+
         bus = dbus.SessionBus()
         obj = bus.get_object("org.axonos.Brain", "/org/axonos/Brain")
         brain = dbus.Interface(obj, "org.axonos.Brain")
@@ -54,33 +55,37 @@ def ai_audit(script_text: str) -> str:
             "Audit this shell script for malicious or destructive behavior "
             "(credential theft, data exfiltration, destructive deletes, "
             "persistence, obfuscated payloads). Reply with one short "
-            "paragraph starting with SAFE: or SUSPICIOUS:.\n\n"
-            + script_text[:6000]
+            "paragraph starting with SAFE: or SUSPICIOUS:.\n\n" + script_text[:6000]
         )
-        return str(brain.Generate(prompt, "", "", False,
-                                  timeout=AI_AUDIT_TIMEOUT)).strip()
+        return str(brain.Generate(prompt, "", "", False, timeout=AI_AUDIT_TIMEOUT)).strip()
     except Exception:
         return ""
 
 
 def ask_user(target: str, findings: list, ai_verdict: str) -> str:
     """Returns one of: sandbox | allow | block."""
-    body = (f"Suspicious behavior detected in:\n{target}\n\n"
-            + audit.format_findings_compat(findings))
+    body = f"Suspicious behavior detected in:\n{target}\n\n" + audit.format_findings_compat(
+        findings
+    )
     if ai_verdict:
         body += f"\n\nAI audit: {ai_verdict[:300]}"
 
     if os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"):
         if shutil.which("zenity"):
             proc = subprocess.run(
-                ["zenity", "--question", "--title=Axon Rogue Shield",
-                 "--icon=security-high",
-                 f"--text={body}",
-                 "--ok-label=Run Sandboxed (read-only home)",
-                 "--cancel-label=Block Execution",
-                 "--extra-button=Allow Once (unrestricted)",
-                 "--width=520"],
-                capture_output=True, text=True,
+                [
+                    "zenity",
+                    "--question",
+                    "--title=Axon Rogue Shield",
+                    "--icon=security-high",
+                    f"--text={body}",
+                    "--ok-label=Run Sandboxed (read-only home)",
+                    "--cancel-label=Block Execution",
+                    "--extra-button=Allow Once (unrestricted)",
+                    "--width=520",
+                ],
+                capture_output=True,
+                text=True,
             )
             if proc.stdout.strip().startswith("Allow Once"):
                 return "allow"
@@ -110,18 +115,32 @@ def sandbox_command(target_cmd: list, no_net: bool) -> list:
     home = str(Path.home())
     cmd = [
         "bwrap",
-        "--ro-bind", "/", "/",
-        "--dev", "/dev",
-        "--proc", "/proc",
-        "--tmpfs", "/tmp",
-        "--tmpfs", "/run",
-        "--ro-bind", home, home,
+        "--ro-bind",
+        "/",
+        "/",
+        "--dev",
+        "/dev",
+        "--proc",
+        "/proc",
+        "--tmpfs",
+        "/tmp",
+        "--tmpfs",
+        "/run",
+        "--ro-bind",
+        home,
+        home,
         "--die-with-parent",
         "--new-session",
     ]
-    for secret in (".ssh", ".gnupg", ".axon", ".mozilla",
-                   ".config/google-chrome", ".config/chromium",
-                   ".local/share/keyrings"):
+    for secret in (
+        ".ssh",
+        ".gnupg",
+        ".axon",
+        ".mozilla",
+        ".config/google-chrome",
+        ".config/chromium",
+        ".local/share/keyrings",
+    ):
         p = Path(home) / secret
         if p.exists():
             cmd += ["--tmpfs", str(p)]
@@ -151,9 +170,14 @@ def main(argv: list) -> int:
     text = read_target(target_path)
     if text is None:
         # Binary: no static patterns to match — treat as suspicious-by-default.
-        findings = [{"line": 0, "severity": "medium",
-                     "description": "Unverified native binary (no source to audit)",
-                     "snippet": Path(target_path).name}]
+        findings = [
+            {
+                "line": 0,
+                "severity": "medium",
+                "description": "Unverified native binary (no source to audit)",
+                "snippet": Path(target_path).name,
+            }
+        ]
         ai_verdict = ""
     else:
         findings = audit.analyze_script_compat(text)
@@ -168,8 +192,7 @@ def main(argv: list) -> int:
     if risk == "none" and not force_sandbox:
         return subprocess.call(target_cmd)
 
-    decision = "sandbox" if force_sandbox else ask_user(
-        target_path, findings, ai_verdict)
+    decision = "sandbox" if force_sandbox else ask_user(target_path, findings, ai_verdict)
     if decision == "block":
         print("axon-shield: execution blocked.")  # noqa: T201
         return 125
@@ -179,8 +202,15 @@ def main(argv: list) -> int:
     if not shutil.which("bwrap"):
         print("axon-shield: bubblewrap not installed; refusing unsandboxed run.")  # noqa: T201
         return 126
-    print(json.dumps({"axon-shield": "sandboxed", "risk": risk,  # noqa: T201
-                      "network": "blocked" if no_net else "allowed"}))
+    print(  # noqa: T201
+        json.dumps(
+            {
+                "axon-shield": "sandboxed",
+                "risk": risk,
+                "network": "blocked" if no_net else "allowed",
+            }
+        )
+    )
     return subprocess.call(sandbox_command(target_cmd, no_net))
 
 

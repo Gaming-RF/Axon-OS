@@ -37,9 +37,11 @@ class TestSafetyHelper:
         assert decision.sandbox_recommended is False
 
     def test_format_findings(self):
-        text = safety.format_findings([
-            {"line": 3, "severity": "high", "description": "Reads SSH keys"},
-        ])
+        text = safety.format_findings(
+            [
+                {"line": 3, "severity": "high", "description": "Reads SSH keys"},
+            ]
+        )
         assert "line 3" in text
         assert "SSH keys" in text
 
@@ -52,4 +54,3 @@ class TestSafetyHelper:
     def test_flags_rm_rf(self):
         decision = safety.assess_command("rm -rf /")
         assert decision.sandbox_recommended is True
-

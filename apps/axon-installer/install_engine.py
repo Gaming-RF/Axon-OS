@@ -36,7 +36,7 @@ import subprocess
 import sys
 
 TARGET = "/target"
-MIN_INSTALL_MIB = 16384          # 16 GiB minimum for the root partition
+MIN_INSTALL_MIB = 16384  # 16 GiB minimum for the root partition
 ESP_MIB = 512
 BIOS_GRUB_MIB = 2
 ESP_PARTTYPE_GUID = "c12a7328-f81f-11d2-ba4b-00a0c93ec93b"
@@ -49,7 +49,10 @@ KNOWN_PROVIDERS = ("ollama", "anthropic", "openai", "google", "openrouter")
 PROVIDER_DEFAULTS = {
     "anthropic": {"base_url": "https://api.anthropic.com", "model": "claude-sonnet-4-6"},
     "openai": {"base_url": "https://api.openai.com/v1", "model": "gpt-4o-mini"},
-    "google": {"base_url": "https://generativelanguage.googleapis.com", "model": "gemini-2.0-flash"},
+    "google": {
+        "base_url": "https://generativelanguage.googleapis.com",
+        "model": "gemini-2.0-flash",
+    },
     "openrouter": {"base_url": "https://openrouter.ai/api/v1", "model": "openrouter/auto"},
 }
 
@@ -57,6 +60,7 @@ PROVIDER_DEFAULTS = {
 # ---------------------------------------------------------------------------
 # Progress / process helpers
 # ---------------------------------------------------------------------------
+
 
 def emit(percent: int, message: str) -> None:
     print(f"AXON-PROGRESS:{percent}:{message}", flush=True)  # noqa: T201
@@ -90,6 +94,7 @@ def run_chroot(cmd, check=True, input_text=None):
 # ---------------------------------------------------------------------------
 # Config validation (pure — also exercised by the test suite)
 # ---------------------------------------------------------------------------
+
 
 def validate_config(cfg: dict) -> list:
     """Return a list of human-readable problems; empty list means valid."""
@@ -126,6 +131,7 @@ def validate_config(cfg: dict) -> list:
 # Disk inspection helpers
 # ---------------------------------------------------------------------------
 
+
 def part_node(disk: str, number: int) -> str:
     """Partition device path: /dev/sda + 1 -> /dev/sda1, nvme0n1 -> nvme0n1p1."""
     suffix = f"p{number}" if disk[-1].isdigit() else str(number)
@@ -137,7 +143,7 @@ def is_uefi() -> bool:
 
 
 def live_medium_disk() -> str:
-    """Whole-disk device backing the live medium (/cdrom), or ''. """
+    """Whole-disk device backing the live medium (/cdrom), or ''."""
     for mount in ("/cdrom", "/run/live/medium"):
         if not os.path.ismount(mount):
             continue
@@ -223,14 +229,13 @@ def settle(disk: str) -> None:
 # Partitioning
 # ---------------------------------------------------------------------------
 
+
 def partition_erase(disk: str):
     """Wipe disk, fresh GPT: bios_grub + ESP + root. Works for BIOS and UEFI."""
     run(["wipefs", "-a", disk])
     run(["sgdisk", "--zap-all", disk])
-    run(["sgdisk", "-n", f"1:0:+{BIOS_GRUB_MIB}MiB", "-t", "1:ef02",
-         "-c", "1:BIOS boot", disk])
-    run(["sgdisk", "-n", f"2:0:+{ESP_MIB}MiB", "-t", "2:ef00",
-         "-c", "2:EFI System", disk])
+    run(["sgdisk", "-n", f"1:0:+{BIOS_GRUB_MIB}MiB", "-t", "1:ef02", "-c", "1:BIOS boot", disk])
+    run(["sgdisk", "-n", f"2:0:+{ESP_MIB}MiB", "-t", "2:ef00", "-c", "2:EFI System", disk])
     run(["sgdisk", "-n", "3:0:0", "-t", "3:8300", "-c", "3:AxonOS", disk])
     settle(disk)
     return part_node(disk, 2), part_node(disk, 3), True  # esp, root, esp_is_new
@@ -269,11 +274,35 @@ def partition_alongside(disk: str):
     def mkpart(fs_hint, p_start, p_end, name):
         before = list_partitions(disk)
         if label == "gpt":
-            run(["parted", "-s", disk, "unit", "MiB",
-                 "mkpart", name, fs_hint, f"{p_start:.0f}", f"{p_end:.0f}"])
+            run(
+                [
+                    "parted",
+                    "-s",
+                    disk,
+                    "unit",
+                    "MiB",
+                    "mkpart",
+                    name,
+                    fs_hint,
+                    f"{p_start:.0f}",
+                    f"{p_end:.0f}",
+                ]
+            )
         else:
-            run(["parted", "-s", disk, "unit", "MiB",
-                 "mkpart", "primary", fs_hint, f"{p_start:.0f}", f"{p_end:.0f}"])
+            run(
+                [
+                    "parted",
+                    "-s",
+                    disk,
+                    "unit",
+                    "MiB",
+                    "mkpart",
+                    "primary",
+                    fs_hint,
+                    f"{p_start:.0f}",
+                    f"{p_end:.0f}",
+                ]
+            )
         settle(disk)
         new = list_partitions(disk) - before
         if len(new) != 1:
@@ -302,6 +331,7 @@ def partition_alongside(disk: str):
 # ---------------------------------------------------------------------------
 # Install steps
 # ---------------------------------------------------------------------------
+
 
 def format_and_mount(esp: str, root: str, esp_is_new: bool) -> str:
     """Create filesystems and mount the target. Returns the root fs type.
@@ -337,9 +367,21 @@ def format_and_mount(esp: str, root: str, esp_is_new: bool) -> str:
 
 
 RSYNC_EXCLUDES = [
-    "/dev/*", "/proc/*", "/sys/*", "/run/*", "/tmp/*", "/mnt/*", "/media/*",
-    "/cdrom", "/target", "/swapfile", "/var/crash/*", "/var/tmp/*",
-    "/lost+found", "/boot/efi/*", "/home/*/.cache/*",
+    "/dev/*",
+    "/proc/*",
+    "/sys/*",
+    "/run/*",
+    "/tmp/*",
+    "/mnt/*",
+    "/media/*",
+    "/cdrom",
+    "/target",
+    "/swapfile",
+    "/var/crash/*",
+    "/var/tmp/*",
+    "/lost+found",
+    "/boot/efi/*",
+    "/home/*/.cache/*",
 ]
 
 
@@ -370,8 +412,12 @@ def copy_system(progress_cb) -> None:
 
 
 def mount_chroot_binds() -> None:
-    for fs, target in (("/dev", "dev"), ("/dev/pts", "dev/pts"),
-                       ("/proc", "proc"), ("/sys", "sys")):
+    for fs, target in (
+        ("/dev", "dev"),
+        ("/dev/pts", "dev/pts"),
+        ("/proc", "proc"),
+        ("/sys", "sys"),
+    ):
         os.makedirs(f"{TARGET}/{target}", exist_ok=True)
         run(["mount", "--bind", fs, f"{TARGET}/{target}"])
     if os.path.exists("/etc/resolv.conf"):
@@ -385,8 +431,15 @@ def mount_chroot_binds() -> None:
 
 
 def unmount_all() -> None:
-    for mp in (f"{TARGET}/dev/pts", f"{TARGET}/dev", f"{TARGET}/proc",
-               f"{TARGET}/sys", f"{TARGET}/boot/efi", f"{TARGET}/home", TARGET):
+    for mp in (
+        f"{TARGET}/dev/pts",
+        f"{TARGET}/dev",
+        f"{TARGET}/proc",
+        f"{TARGET}/sys",
+        f"{TARGET}/boot/efi",
+        f"{TARGET}/home",
+        TARGET,
+    ):
         run(["umount", "-lf", mp], check=False)
 
 
@@ -420,8 +473,7 @@ def create_swapfile(fs_type: str) -> bool:
     try:
         if fs_type == "btrfs":
             os.makedirs(f"{TARGET}/swap", exist_ok=True)
-            run(["btrfs", "filesystem", "mkswapfile", "--size", "2g",
-                 f"{TARGET}/swap/swapfile"])
+            run(["btrfs", "filesystem", "mkswapfile", "--size", "2g", f"{TARGET}/swap/swapfile"])
         else:
             swap = f"{TARGET}/swapfile"
             run(["fallocate", "-l", "2G", swap])
@@ -452,8 +504,7 @@ def configure_identity(user: dict) -> None:
     if username == live_user:
         run_chroot(["usermod", "-c", user["full_name"], username])
     else:
-        run_chroot(["useradd", "-m", "-s", "/bin/bash",
-                    "-c", user["full_name"], username])
+        run_chroot(["useradd", "-m", "-s", "/bin/bash", "-c", user["full_name"], username])
         # Remove the casper live user copied over with the filesystem
         run_chroot(["deluser", "--remove-home", live_user], check=False)
     for group in ("adm", "sudo", "cdrom", "dip", "plugdev", "video", "audio"):
@@ -494,12 +545,20 @@ def install_bootloader(disk: str, mode: str) -> None:
             f.write(content)
 
     if is_uefi():
-        run_chroot(["grub-install", "--target=x86_64-efi",
-                    "--efi-directory=/boot/efi", "--bootloader-id=AxonOS",
-                    "--recheck"])
+        run_chroot(
+            [
+                "grub-install",
+                "--target=x86_64-efi",
+                "--efi-directory=/boot/efi",
+                "--bootloader-id=AxonOS",
+                "--recheck",
+            ]
+        )
         # Fallback path for firmware that ignores NVRAM entries
-        run_chroot(["grub-install", "--target=x86_64-efi",
-                    "--efi-directory=/boot/efi", "--removable"], check=False)
+        run_chroot(
+            ["grub-install", "--target=x86_64-efi", "--efi-directory=/boot/efi", "--removable"],
+            check=False,
+        )
     else:
         run_chroot(["grub-install", "--target=i386-pc", "--recheck", disk])
     run_chroot(["update-grub"])
@@ -519,17 +578,24 @@ def setup_boot_watchdog(root: str, fs_type: str) -> None:
     try:
         if os.path.isdir(f"{TARGET}/boot/efi"):
             run_chroot(["mkdir", "-p", "/boot/efi/axon"], check=False)
-            run_chroot(["grub-editenv", "/boot/efi/axon/grubenv", "create"],
-                       check=False)
-            run_chroot(["grub-editenv", "/boot/efi/axon/grubenv",
-                        "set", "boot_attempts=0"], check=False)
+            run_chroot(["grub-editenv", "/boot/efi/axon/grubenv", "create"], check=False)
+            run_chroot(
+                ["grub-editenv", "/boot/efi/axon/grubenv", "set", "boot_attempts=0"], check=False
+            )
         toplevel = f"{TARGET}-btrfs-toplevel"
         os.makedirs(toplevel, exist_ok=True)
         run(["mount", "-o", "subvolid=5", root, toplevel])
         try:
             if not os.path.exists(f"{toplevel}/@axon-fallback"):
-                run(["btrfs", "subvolume", "snapshot",
-                     f"{toplevel}/@", f"{toplevel}/@axon-fallback"])
+                run(
+                    [
+                        "btrfs",
+                        "subvolume",
+                        "snapshot",
+                        f"{toplevel}/@",
+                        f"{toplevel}/@axon-fallback",
+                    ]
+                )
         finally:
             run(["umount", toplevel], check=False)
     except (RuntimeError, OSError) as exc:
@@ -545,10 +611,14 @@ def setup_ai(cfg: dict) -> None:
     if ai.get("install_ollama"):
         os.makedirs(f"{TARGET}/etc/axon", exist_ok=True)
         with open(f"{TARGET}/etc/axon/ai-setup.json", "w") as f:
-            json.dump({
-                "install_ollama": True,
-                "ollama_model": ai.get("ollama_model", "llama3.2:3b"),
-            }, f, indent=2)
+            json.dump(
+                {
+                    "install_ollama": True,
+                    "ollama_model": ai.get("ollama_model", "llama3.2:3b"),
+                },
+                f,
+                indent=2,
+            )
         run_chroot(["systemctl", "enable", "axon-ai-firstboot.service"], check=False)
 
     # Per-user AI configuration (~/.axon/config.toml) — API keys live here,
@@ -556,17 +626,20 @@ def setup_ai(cfg: dict) -> None:
     lines = ["# Axon OS — AI configuration (generated by the installer)", "", "[ai]"]
     if ai.get("install_ollama"):
         lines.append(f'default_model = "{ai.get("ollama_model", "llama3.2:3b")}"')
-        lines += ["", "[providers.ollama]", "enabled = true",
-                  'host = "http://127.0.0.1:11434"']
+        lines += ["", "[providers.ollama]", "enabled = true", 'host = "http://127.0.0.1:11434"']
     for provider in ai.get("providers", []):
         pid = provider.get("id")
         if pid == "ollama" or pid not in PROVIDER_DEFAULTS:
             continue
         defaults = PROVIDER_DEFAULTS[pid]
-        lines += ["", f"[providers.{pid}]", "enabled = true",
-                  f'api_key = "{provider.get("api_key", "").strip()}"',
-                  f'base_url = "{defaults["base_url"]}"',
-                  f'model = "{defaults["model"]}"']
+        lines += [
+            "",
+            f"[providers.{pid}]",
+            "enabled = true",
+            f'api_key = "{provider.get("api_key", "").strip()}"',
+            f'base_url = "{defaults["base_url"]}"',
+            f'model = "{defaults["model"]}"',
+        ]
 
     home = f"{TARGET}/home/{user}"
     axon_dir = f"{home}/.axon"
@@ -581,6 +654,7 @@ def setup_ai(cfg: dict) -> None:
 # ---------------------------------------------------------------------------
 # Orchestration
 # ---------------------------------------------------------------------------
+
 
 def install(cfg: dict) -> None:
     disk = cfg["target_disk"]

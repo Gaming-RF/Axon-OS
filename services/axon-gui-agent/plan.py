@@ -52,10 +52,7 @@ def _check_op(op: dict) -> str | None:
             return "gsettings_set missing value"
         if not schema or not key:
             return "gsettings_set missing schema/key"
-        if not any(
-            schema == p or schema.startswith(p + ".")
-            for p in ALLOWED_SCHEMA_PREFIXES
-        ):
+        if not any(schema == p or schema.startswith(p + ".") for p in ALLOWED_SCHEMA_PREFIXES):
             return f"schema not allowed: {schema}"
         if any(c in schema + key for c in ";|&$`\n"):
             return "illegal characters in schema/key"
@@ -82,10 +79,17 @@ def validate_plan(raw: str) -> tuple[list[dict], list[str]]:
     """
     text = raw.strip()
     if text.startswith("```"):
-        text = text.strip("`")
-        if text.startswith("json"):
-            text = text[4:]
-        text = text.strip()
+        # Strip markdown fence: find the closing ```
+        first_newline = text.find("\n", 3)
+        if first_newline > 0:
+            rest = text[first_newline + 1 :]
+            closing = rest.rfind("```")
+            if closing >= 0:
+                rest = rest[:closing]
+            text = rest.strip()
+        else:
+            # No newline after opening fence — treat as single line
+            text = text.strip("`").strip()
     try:
         data = json.loads(text)
     except (json.JSONDecodeError, ValueError) as exc:
@@ -109,7 +113,7 @@ def validate_plan(raw: str) -> tuple[list[dict], list[str]]:
     return ops, errors
 
 
-def to_gvariant(value) -> str:
+def to_gvariant(value: object) -> str:
     """Serialise a JSON value for `gsettings set`."""
     if isinstance(value, bool):
         return "true" if value else "false"

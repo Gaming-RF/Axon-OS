@@ -22,8 +22,7 @@ class TestBrainService:
             "library/llama3",
         ]
         for name in valid_names:
-            assert BrainService._validate_model_name(name), \
-                f"Model name '{name}' should be valid"
+            assert BrainService._validate_model_name(name), f"Model name '{name}' should be valid"
 
     def test_validate_model_name_invalid(self) -> None:
         """Test model name validation with invalid names."""
@@ -40,8 +39,9 @@ class TestBrainService:
             123,  # Wrong type
         ]
         for name in invalid_names:
-            assert not BrainService._validate_model_name(name), \
+            assert not BrainService._validate_model_name(name), (
                 f"Model name '{name}' should be invalid"
+            )
 
     def test_validate_prompt_valid(self) -> None:
         """Test prompt validation with valid prompts."""
@@ -53,8 +53,9 @@ class TestBrainService:
             "What is the meaning of life?",
         ]
         for prompt in valid_prompts:
-            assert BrainService._validate_prompt(prompt), \
+            assert BrainService._validate_prompt(prompt), (
                 f"Prompt should be valid: {prompt[:50]}..."
+            )
 
     def test_validate_prompt_invalid(self) -> None:
         """Test prompt validation with invalid prompts."""
@@ -66,8 +67,7 @@ class TestBrainService:
             None,  # None type
         ]
         for prompt in invalid_prompts:
-            assert not BrainService._validate_prompt(prompt), \
-                f"Prompt should be invalid: {prompt}"
+            assert not BrainService._validate_prompt(prompt), f"Prompt should be invalid: {prompt}"
 
 
 class TestConversationStore:

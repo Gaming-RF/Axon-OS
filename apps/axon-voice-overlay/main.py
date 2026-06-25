@@ -4,9 +4,9 @@ import sys
 
 import gi
 
-gi.require_version('Gtk', '4.0')
-gi.require_version('Adw', '1')
-gi.require_version('Gdk', '4.0')
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
+gi.require_version("Gdk", "4.0")
 from gi.repository import Adw, Gdk, GLib, Gtk
 
 
@@ -30,16 +30,17 @@ class VoiceOverlay(Gtk.ApplicationWindow):
 
         # Set up CSS to make the window background completely transparent
         css_provider = Gtk.CssProvider()
-        css_provider.load_from_data("""
+        css_provider.load_from_data(
+            """
             window {
                 background-color: transparent;
                 background: transparent;
             }
-        """, -1)
+        """,
+            -1,
+        )
         Gtk.StyleContext.add_provider_for_display(
-            Gdk.Display.get_default(),
-            css_provider,
-            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+            Gdk.Display.get_default(), css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
         )
 
         # Animation loop (60 FPS)
@@ -58,13 +59,37 @@ class VoiceOverlay(Gtk.ApplicationWindow):
     def on_draw(self, drawing_area, cr, width, height):
         # Draw translucent overlapping waves (purple, cyan, violet)
         # Main purple wave
-        self.draw_wave(cr, width, height, amplitude=35, frequency=0.015, phase_offset=self.phase, color=(0.54, 0.36, 0.96, 0.4))
+        self.draw_wave(
+            cr,
+            width,
+            height,
+            amplitude=35,
+            frequency=0.015,
+            phase_offset=self.phase,
+            color=(0.54, 0.36, 0.96, 0.4),
+        )
 
         # Secondary cyan wave
-        self.draw_wave(cr, width, height, amplitude=25, frequency=0.02, phase_offset=self.phase * 1.5 + 1.0, color=(0.12, 0.73, 0.88, 0.3))
+        self.draw_wave(
+            cr,
+            width,
+            height,
+            amplitude=25,
+            frequency=0.02,
+            phase_offset=self.phase * 1.5 + 1.0,
+            color=(0.12, 0.73, 0.88, 0.3),
+        )
 
         # Third deep violet wave
-        self.draw_wave(cr, width, height, amplitude=20, frequency=0.01, phase_offset=-self.phase * 0.8 + 2.0, color=(0.4, 0.2, 0.8, 0.3))
+        self.draw_wave(
+            cr,
+            width,
+            height,
+            amplitude=20,
+            frequency=0.01,
+            phase_offset=-self.phase * 0.8 + 2.0,
+            color=(0.4, 0.2, 0.8, 0.3),
+        )
 
     def draw_wave(self, cr, width, height, amplitude, frequency, phase_offset, color):
         cr.set_source_rgba(*color)
@@ -81,9 +106,10 @@ class VoiceOverlay(Gtk.ApplicationWindow):
 
         cr.stroke()
 
+
 class VoiceOverlayApp(Adw.Application):
     def __init__(self, **kwargs):
-        super().__init__(application_id='org.axonos.VoiceOverlay', **kwargs)
+        super().__init__(application_id="org.axonos.VoiceOverlay", **kwargs)
 
     def do_activate(self):
         win = VoiceOverlay(application=self)
@@ -92,6 +118,7 @@ class VoiceOverlayApp(Adw.Application):
         # In a real compositor, window configuration is handled via shell constraints
         win.set_keep_above(True)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     app = VoiceOverlayApp()
     sys.exit(app.run(sys.argv))

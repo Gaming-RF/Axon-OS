@@ -13,6 +13,7 @@ desktop notification. Everything runs on-device.
 
 import logging
 import os
+import re
 import shutil
 import signal
 import subprocess
@@ -40,15 +41,26 @@ log = configure_app_logger("axon-voice", level=logging.INFO)
 
 WHISPER_MODEL = os.environ.get("AXON_WHISPER_MODEL", "base.en")
 
+# Allowlist of safe characters for AI-generated app names (no paths, no metacharacters)
+_SAFE_APP_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+
+
+def _validate_app_name(name: str) -> str | None:
+    """Return sanitized app name, or None if the name is unsafe."""
+    name = name.strip()
+    if not name or len(name) > 128:
+        return None
+    if not _SAFE_APP_RE.match(name):
+        return None
+    return name
+
 
 class VoiceService(dbus.service.Object):
     def __init__(self):
         dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
         self.session_bus = dbus.SessionBus()
         try:
-            self.bus_name = dbus.service.BusName(
-                "org.axonos.Voice", bus=self.session_bus
-            )
+            self.bus_name = dbus.service.BusName("org.axonos.Voice", bus=self.session_bus)
         except dbus.exceptions.NameExistsException:
             log.error("org.axonos.Voice service is already running.")
             sys.exit(1)
@@ -121,11 +133,16 @@ class VoiceService(dbus.service.Object):
     def _recorder_command(self, wav_path):
         """Best available CLI recorder: pipewire/pulse first, then ALSA."""
         if shutil.which("parecord"):
-            return ["parecord", "--rate=16000", "--channels=1",
-                    "--format=s16le", "--file-format=wav", wav_path]
+            return [
+                "parecord",
+                "--rate=16000",
+                "--channels=1",
+                "--format=s16le",
+                "--file-format=wav",
+                wav_path,
+            ]
         if shutil.which("arecord"):
-            return ["arecord", "-q", "-f", "S16_LE", "-r", "16000",
-                    "-c", "1", wav_path]
+            return ["arecord", "-q", "-f", "S16_LE", "-r", "16000", "-c", "1", wav_path]
         return None
 
     def _start_recording(self):
@@ -133,8 +150,10 @@ class VoiceService(dbus.service.Object):
         os.close(fd)
         cmd = self._recorder_command(wav_path)
         if cmd is None:
-            self._notify("Axon Voice", "No microphone recorder found "
-                         "(install pulseaudio-utils or alsa-utils).")
+            self._notify(
+                "Axon Voice",
+                "No microphone recorder found (install pulseaudio-utils or alsa-utils).",
+            )
             self.StateChanged("error")
             return False
         try:
@@ -172,9 +191,7 @@ class VoiceService(dbus.service.Object):
             self._busy = True
         self._set_overlay_status("Transcribing on-device...")
         self.StateChanged("transcribing")
-        threading.Thread(
-            target=self._transcribe_and_route, args=(wav,), daemon=True
-        ).start()
+        threading.Thread(target=self._transcribe_and_route, args=(wav,), daemon=True).start()
         return False
 
     # ------------------------------------------------------------------
@@ -185,9 +202,12 @@ class VoiceService(dbus.service.Object):
         if self._whisper is not None:
             return self._whisper
         from faster_whisper import WhisperModel  # lazy: heavy import
+
         WHISPER_DIR.mkdir(parents=True, exist_ok=True)
         self._whisper = WhisperModel(
-            WHISPER_MODEL, device="cpu", compute_type="int8",
+            WHISPER_MODEL,
+            device="cpu",
+            compute_type="int8",
             download_root=str(WHISPER_DIR),
         )
         return self._whisper
@@ -220,10 +240,13 @@ class VoiceService(dbus.service.Object):
         reply = self._classify(text)
         kind, payload = parse_intent_response(reply)
         if kind == "open_app":
-            launcher = ["gtk-launch", payload] if shutil.which("gtk-launch") else [payload]
-            subprocess.Popen(launcher, stdout=subprocess.DEVNULL,
-                             stderr=subprocess.DEVNULL)
-            GLib.idle_add(self._finish, f"Opening {payload}", "")
+            safe_name = _validate_app_name(payload)
+            if safe_name:
+                launcher = ["gtk-launch", safe_name] if shutil.which("gtk-launch") else [safe_name]
+                subprocess.Popen(launcher, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                GLib.idle_add(self._finish, f"Opening {safe_name}", "")
+            else:
+                GLib.idle_add(self._finish, "", f"Refused to launch unsafe app name: {payload!r}")
         elif kind == "run_command":
             safe_exec(payload)
             GLib.idle_add(self._finish, f"Running: {payload}", "")
@@ -256,16 +279,20 @@ class VoiceService(dbus.service.Object):
         for eng in candidates:
             if eng == "piper" and shutil.which("piper"):
                 try:
-                    subprocess.Popen(["piper", "-t", text[:1000]],
-                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    subprocess.Popen(
+                        ["piper", "-t", text[:1000]],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
                     return
                 except Exception as e:
                     log.debug("piper TTS failed: %s", e)
                     continue
             if eng in ("espeak", "espeak-ng") and shutil.which(eng):
                 try:
-                    subprocess.Popen([eng, text[:1000]],
-                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    subprocess.Popen(
+                        [eng, text[:1000]], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                    )
                     return
                 except Exception as e:
                     log.debug("%s TTS failed: %s", eng, e)
@@ -275,7 +302,12 @@ class VoiceService(dbus.service.Object):
                     fd, tmp = tempfile.mkstemp(prefix="axon-tts-", suffix=".wav")
                     os.close(fd)
                     subprocess.check_call(["pico2wave", "-w", tmp, text[:1000]])
-                    subprocess.Popen(["aplay", tmp], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    proc = subprocess.Popen(
+                        ["aplay", tmp], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                    )
+                    threading.Thread(
+                        target=self._cleanup_after_tts, args=(proc, tmp), daemon=True
+                    ).start()
                     return
                 except Exception as e:
                     log.debug("pico2wave TTS failed: %s", e)
@@ -286,18 +318,38 @@ class VoiceService(dbus.service.Object):
                     continue
             if eng == "spd-say" and shutil.which("spd-say"):
                 try:
-                    subprocess.Popen(["spd-say", "--wait-mode", "no", text[:500]],
-                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    subprocess.Popen(
+                        ["spd-say", "--wait-mode", "no", text[:500]],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
                     return
                 except Exception as e:
                     log.debug("spd-say TTS failed: %s", e)
                     continue
+        log.warning("No TTS engine available (tried: %s)", ", ".join(candidates))
+        self._notify(
+            "Axon Voice", "No text-to-speech engine found. Install piper, espeak, or spd-say."
+        )
 
     def _notify(self, title, body):
         if shutil.which("notify-send"):
-            subprocess.Popen(["notify-send", "-i", "audio-input-microphone",
-                              title, body[:400]],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.Popen(
+                ["notify-send", "-i", "audio-input-microphone", title, body[:400]],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+
+    def _cleanup_after_tts(self, proc, tmp_path):
+        """Wait for TTS playback to finish, then delete the temp file."""
+        try:
+            proc.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
 
     def _finish(self, result, error):
         with self._lock:
@@ -318,11 +370,14 @@ class VoiceService(dbus.service.Object):
         try:
             if self._overlay is None:
                 import gi
+
                 gi.require_version("Gtk", "4.0")
                 from gi.repository import Gtk
+
                 if not Gtk.init_check():
                     return
                 from overlay import VoiceOverlay
+
                 self._overlay = VoiceOverlay()
             self._overlay.show(status)
         except Exception as exc:
@@ -367,7 +422,9 @@ class VoiceService(dbus.service.Object):
                 break
             try:
                 if is_speech_wav(wav):
-                    threading.Thread(target=self._transcribe_and_route, args=(wav,), daemon=True).start()
+                    threading.Thread(
+                        target=self._transcribe_and_route, args=(wav,), daemon=True
+                    ).start()
                     # cooldown to avoid repeated immediate triggers
                     self._ambient_stop.wait(1.2)
                 else:

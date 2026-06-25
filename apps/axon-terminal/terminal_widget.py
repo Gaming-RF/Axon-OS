@@ -45,10 +45,22 @@ _ACCENT.parse("#c4b5fd")
 # Terminal 16-colour palette (dark theme matching Axon branding)
 _PALETTE: list[Gdk.RGBA] = []
 _PALETTE_HEX = [
-    "#1a1a24", "#f87171", "#86efac", "#fde68a",
-    "#93c5fd", "#c4b5fd", "#67e8f9", "#e4e4e8",
-    "#3a3a4e", "#fca5a5", "#a7f3d0", "#fef08a",
-    "#bfdbfe", "#ddd6fe", "#a5f3fc", "#ffffff",
+    "#1a1a24",
+    "#f87171",
+    "#86efac",
+    "#fde68a",
+    "#93c5fd",
+    "#c4b5fd",
+    "#67e8f9",
+    "#e4e4e8",
+    "#3a3a4e",
+    "#fca5a5",
+    "#a7f3d0",
+    "#fef08a",
+    "#bfdbfe",
+    "#ddd6fe",
+    "#a5f3fc",
+    "#ffffff",
 ]
 for _hex in _PALETTE_HEX:
     _c = Gdk.RGBA()
@@ -59,6 +71,7 @@ for _hex in _PALETTE_HEX:
 # ---------------------------------------------------------------------------
 # Single terminal tab
 # ---------------------------------------------------------------------------
+
 
 class _TerminalTab:
     """Data associated with a single terminal tab."""
@@ -87,6 +100,7 @@ class _TerminalTab:
 # TerminalWidget
 # ---------------------------------------------------------------------------
 
+
 class TerminalWidget(Gtk.Box):
     """Multi-tab VTE terminal with AI-powered diagnostics and NL command bar."""
 
@@ -111,9 +125,7 @@ class TerminalWidget(Gtk.Box):
 
         # ---- AI Diagnosis overlay (inline below terminal) -----------------
         self._diagnosis_revealer = Gtk.Revealer()
-        self._diagnosis_revealer.set_transition_type(
-            Gtk.RevealerTransitionType.SLIDE_UP
-        )
+        self._diagnosis_revealer.set_transition_type(Gtk.RevealerTransitionType.SLIDE_UP)
         self._diagnosis_revealer.set_reveal_child(False)
 
         diag_frame = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -166,9 +178,7 @@ class TerminalWidget(Gtk.Box):
 
         # ---- NL command bar (toggled with Ctrl+Shift+A) -------------------
         self._nl_revealer = Gtk.Revealer()
-        self._nl_revealer.set_transition_type(
-            Gtk.RevealerTransitionType.SLIDE_UP
-        )
+        self._nl_revealer.set_transition_type(Gtk.RevealerTransitionType.SLIDE_UP)
         self._nl_revealer.set_reveal_child(False)
 
         nl_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
@@ -274,7 +284,7 @@ class TerminalWidget(Gtk.Box):
             GLib.SpawnFlags.DEFAULT,
             None,  # child_setup
             None,  # child_setup_data
-            -1,    # timeout
+            -1,  # timeout
             None,  # cancellable
             self._on_spawn_ready,
         )
@@ -305,6 +315,7 @@ class TerminalWidget(Gtk.Box):
         """Callback after async shell spawn completes."""
         if error is not None:
             from axon_logger import configure_app_logger
+
             logger = configure_app_logger(__name__)
             logger.error("[axon-terminal] Spawn error: %s", error.message)
             return
@@ -314,9 +325,7 @@ class TerminalWidget(Gtk.Box):
                 tab.pid = pid
                 break
 
-    def _on_close_page(
-        self, tab_view: Adw.TabView, page: Adw.TabPage
-    ) -> bool:
+    def _on_close_page(self, tab_view: Adw.TabView, page: Adw.TabPage) -> bool:
         """Handle tab close request."""
         # Remove from our tracking list
         self._tabs = [t for t in self._tabs if t.page is not page]
@@ -340,18 +349,14 @@ class TerminalWidget(Gtk.Box):
     # Command tracking
     # ------------------------------------------------------------------
 
-    def _on_contents_changed(
-        self, terminal: Vte.Terminal, tab: _TerminalTab
-    ) -> None:
+    def _on_contents_changed(self, terminal: Vte.Terminal, tab: _TerminalTab) -> None:
         """Track terminal content changes for command history."""
         # VTE doesn't give us structured command data; we rely on
         # child-exited for failure detection. This signal is available
         # for future enhancements (e.g. shell integration via OSC).
         pass
 
-    def _on_child_exited(
-        self, terminal: Vte.Terminal, exit_status: int, tab: _TerminalTab
-    ) -> None:
+    def _on_child_exited(self, terminal: Vte.Terminal, exit_status: int, tab: _TerminalTab) -> None:
         """Called when the shell or a command exits.
 
         For interactive shells the exit_status is from the shell itself.
@@ -430,9 +435,7 @@ class TerminalWidget(Gtk.Box):
             chip.connect("clicked", self._on_suggestion_clicked, cmd)
             self._suggestion_box.append(chip)
 
-    def _on_suggestion_clicked(
-        self, button: Gtk.Button, command: str
-    ) -> None:
+    def _on_suggestion_clicked(self, button: Gtk.Button, command: str) -> None:
         """Execute a suggested command in the active terminal."""
         tab = self._get_active_tab()
         if tab is not None:
@@ -537,7 +540,9 @@ class TerminalWidget(Gtk.Box):
         if decision.sandbox_recommended:
             # Build a simple inline prompt in GTK4-friendly style.
             transient = self.get_root() if hasattr(self.get_root(), "present") else None
-            dialog = Gtk.Dialog(title="Suspicious command detected", transient_for=transient, modal=True)
+            dialog = Gtk.Dialog(
+                title="Suspicious command detected", transient_for=transient, modal=True
+            )
             dialog.add_button("Block", Gtk.ResponseType.CANCEL)
             dialog.add_button("Allow Once", Gtk.ResponseType.YES)
             dialog.add_button("Run Sandboxed", Gtk.ResponseType.OK)
@@ -556,12 +561,21 @@ class TerminalWidget(Gtk.Box):
                     return
                 if resp == Gtk.ResponseType.OK:
                     try:
-                        tmp = Path(tempfile.mktemp(prefix="axon-term-", suffix=".sh"))
+                        tmp_fd, tmp_path = tempfile.mkstemp(prefix="axon-term-", suffix=".sh")
+                        os.close(tmp_fd)
+                        tmp = Path(tmp_path)
                         tmp.write_text(f"#!/bin/bash\n{command}\n")
                         tmp.chmod(0o700)
-                        shield_script = Path(__file__).resolve().parents[2] / "services" / "axon-sandbox" / "shield.py"
+                        shield_script = (
+                            Path(__file__).resolve().parents[2]
+                            / "services"
+                            / "axon-sandbox"
+                            / "shield.py"
+                        )
                         self.new_tab("Sandbox")
-                        self._tabs[-1].terminal.feed_child((f"python3 '{shield_script}' --yes-sandbox '{tmp}'\n").encode())
+                        self._tabs[-1].terminal.feed_child(
+                            (f"python3 '{shield_script}' --yes-sandbox '{tmp}'\n").encode()
+                        )
                         return
                     except Exception:
                         pass

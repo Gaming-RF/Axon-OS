@@ -28,6 +28,7 @@ def load_css():
             Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
         )
 
+
 class SidebarRow(Gtk.ListBoxRow):
     def __init__(self, name, icon_name, path_val):
         super().__init__()
@@ -47,6 +48,7 @@ class SidebarRow(Gtk.ListBoxRow):
 
         self.set_child(box)
 
+
 class FileRow(Gtk.ListBoxRow):
     def __init__(self, item):
         super().__init__()
@@ -57,17 +59,34 @@ class FileRow(Gtk.ListBoxRow):
         hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
 
         # Icon based on type
-        if item.get('is_dir', False):
+        if item.get("is_dir", False):
             icon_name = "folder-symbolic"
         else:
-            ftype = item.get('file_type', '').lower()
-            if ftype in ['jpg', 'jpeg', 'png', 'gif', 'svg', 'bmp', 'webp']:
+            ftype = item.get("file_type", "").lower()
+            if ftype in ["jpg", "jpeg", "png", "gif", "svg", "bmp", "webp"]:
                 icon_name = "image-x-generic-symbolic"
-            elif ftype in ['mp3', 'ogg', 'wav', 'flac', 'm4a']:
+            elif ftype in ["mp3", "ogg", "wav", "flac", "m4a"]:
                 icon_name = "audio-x-generic-symbolic"
-            elif ftype in ['mp4', 'mkv', 'avi', 'mov', 'webm']:
+            elif ftype in ["mp4", "mkv", "avi", "mov", "webm"]:
                 icon_name = "video-x-generic-symbolic"
-            elif ftype in ['py', 'js', 'ts', 'tsx', 'jsx', 'rs', 'c', 'cpp', 'h', 'sh', 'html', 'css', 'toml', 'json', 'yaml', 'yml']:
+            elif ftype in [
+                "py",
+                "js",
+                "ts",
+                "tsx",
+                "jsx",
+                "rs",
+                "c",
+                "cpp",
+                "h",
+                "sh",
+                "html",
+                "css",
+                "toml",
+                "json",
+                "yaml",
+                "yml",
+            ]:
                 icon_name = "text-x-script-symbolic"
             else:
                 icon_name = "text-x-generic-symbolic"
@@ -80,14 +99,14 @@ class FileRow(Gtk.ListBoxRow):
         vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         vbox.set_hexpand(True)
 
-        name_lbl = Gtk.Label(label=item['file_name'])
+        name_lbl = Gtk.Label(label=item["file_name"])
         name_lbl.set_halign(Gtk.Align.START)
         name_lbl.get_style_context().add_class("file-name-label")
-        name_lbl.set_ellipsize(3) # Pango.EllipsizeMode.END
+        name_lbl.set_ellipsize(3)  # Pango.EllipsizeMode.END
         vbox.append(name_lbl)
 
         # Show path or snippet
-        path_lbl = Gtk.Label(label=item['file_path'])
+        path_lbl = Gtk.Label(label=item["file_path"])
         path_lbl.set_halign(Gtk.Align.START)
         path_lbl.get_style_context().add_class("file-path-label")
         path_lbl.set_ellipsize(3)
@@ -96,7 +115,7 @@ class FileRow(Gtk.ListBoxRow):
         hbox.append(vbox)
 
         # Similarity score badge
-        sim = item.get('similarity', 0.0)
+        sim = item.get("similarity", 0.0)
         if sim > 0:
             sim_pct = int(sim * 100)
             sim_badge = Gtk.Label()
@@ -105,13 +124,13 @@ class FileRow(Gtk.ListBoxRow):
             hbox.append(sim_badge)
 
         # File type badge
-        if not item.get('is_dir', False) and item.get('file_type'):
-            type_badge = Gtk.Label(label=item['file_type'].upper())
+        if not item.get("is_dir", False) and item.get("file_type"):
+            type_badge = Gtk.Label(label=item["file_type"].upper())
             type_badge.get_style_context().add_class("badge-type")
             hbox.append(type_badge)
 
         # File size
-        size_str = format_size(item['file_size'])
+        size_str = format_size(item["file_size"])
         size_lbl = Gtk.Label(label=size_str)
         size_lbl.get_style_context().add_class("file-meta-label")
         size_lbl.set_width_chars(10)
@@ -119,7 +138,7 @@ class FileRow(Gtk.ListBoxRow):
         hbox.append(size_lbl)
 
         # Modified date
-        date_str = format_timestamp(item['last_modified'])
+        date_str = format_timestamp(item["last_modified"])
         date_lbl = Gtk.Label(label=date_str)
         date_lbl.get_style_context().add_class("file-meta-label")
         date_lbl.set_width_chars(18)
@@ -127,6 +146,7 @@ class FileRow(Gtk.ListBoxRow):
         hbox.append(date_lbl)
 
         self.set_child(hbox)
+
 
 class FilesWindow(Adw.ApplicationWindow):
     def __init__(self, app):
@@ -209,12 +229,24 @@ class FilesWindow(Adw.ApplicationWindow):
         # Populate sidebar items
         self.sidebar_list.append(SidebarRow("Search Index", "system-search-symbolic", None))
         self.sidebar_list.append(SidebarRow("Home", "user-home-symbolic", str(Path.home())))
-        self.sidebar_list.append(SidebarRow("Documents", "folder-documents-symbolic", str(Path.home() / "Documents")))
-        self.sidebar_list.append(SidebarRow("Downloads", "folder-download-symbolic", str(Path.home() / "Downloads")))
-        self.sidebar_list.append(SidebarRow("Desktop", "user-desktop-symbolic", str(Path.home() / "Desktop")))
-        self.sidebar_list.append(SidebarRow("Pictures", "folder-pictures-symbolic", str(Path.home() / "Pictures")))
-        self.sidebar_list.append(SidebarRow("Videos", "folder-videos-symbolic", str(Path.home() / "Videos")))
-        self.sidebar_list.append(SidebarRow("Music", "folder-music-symbolic", str(Path.home() / "Music")))
+        self.sidebar_list.append(
+            SidebarRow("Documents", "folder-documents-symbolic", str(Path.home() / "Documents"))
+        )
+        self.sidebar_list.append(
+            SidebarRow("Downloads", "folder-download-symbolic", str(Path.home() / "Downloads"))
+        )
+        self.sidebar_list.append(
+            SidebarRow("Desktop", "user-desktop-symbolic", str(Path.home() / "Desktop"))
+        )
+        self.sidebar_list.append(
+            SidebarRow("Pictures", "folder-pictures-symbolic", str(Path.home() / "Pictures"))
+        )
+        self.sidebar_list.append(
+            SidebarRow("Videos", "folder-videos-symbolic", str(Path.home() / "Videos"))
+        )
+        self.sidebar_list.append(
+            SidebarRow("Music", "folder-music-symbolic", str(Path.home() / "Music"))
+        )
 
         sidebar_box.append(self.sidebar_list)
         layout_box.append(sidebar_box)
@@ -384,7 +416,7 @@ class FilesWindow(Adw.ApplicationWindow):
             while curr != curr.parent:
                 parts.append(curr)
                 curr = curr.parent
-            parts.append(curr) # Root folder
+            parts.append(curr)  # Root folder
             parts.reverse()
 
             first = True
@@ -452,7 +484,7 @@ class FilesWindow(Adw.ApplicationWindow):
                 curr_path = Path(self.current_dir).expanduser().resolve()
                 for r in results:
                     try:
-                        r_path = Path(r['file_path']).expanduser().resolve()
+                        r_path = Path(r["file_path"]).expanduser().resolve()
                         if curr_path in r_path.parents or curr_path == r_path:
                             filtered.append(r)
                     except Exception:
@@ -479,12 +511,12 @@ class FilesWindow(Adw.ApplicationWindow):
         self.refresh_list()
 
     def on_file_selected(self, listbox, row):
-        if row is None or not hasattr(row, 'file_info'):
+        if row is None or not hasattr(row, "file_info"):
             self.show_preview_placeholder()
             return
 
         info = row.file_info
-        if info.get('is_dir', False):
+        if info.get("is_dir", False):
             self.show_preview_placeholder(f"Folder: {info['file_name']}")
             return
 
@@ -499,39 +531,39 @@ class FilesWindow(Adw.ApplicationWindow):
         self.preview_placeholder.set_visible(False)
         self.preview_details.set_visible(True)
 
-        self.prev_title.set_text(info['file_name'])
+        self.prev_title.set_text(info["file_name"])
 
-        size_str = format_size(info['file_size'])
-        date_str = format_timestamp(info['last_modified'])
+        size_str = format_size(info["file_size"])
+        date_str = format_timestamp(info["last_modified"])
         meta = f"Type: {info.get('file_type', 'unknown').upper()}\nSize: {size_str}\nModified: {date_str}"
 
         # Add similarity match info to preview metadata
-        sim = info.get('similarity', 0.0)
+        sim = info.get("similarity", 0.0)
         if sim > 0:
-            meta += f"\nAI Relevance: {int(sim*100)}%"
+            meta += f"\nAI Relevance: {int(sim * 100)}%"
 
         self.prev_meta.set_text(meta)
 
         # Load content summary
         buf = self.prev_summary.get_buffer()
-        summary_text = info.get('content_summary', '')
+        summary_text = info.get("content_summary", "")
         if not summary_text:
             summary_text = "[No text content or file not yet indexed]"
         buf.set_text(summary_text)
 
-        self.selected_file_path = info['file_path']
+        self.selected_file_path = info["file_path"]
 
     def on_file_activated(self, listbox, row):
-        if row is None or not hasattr(row, 'file_info'):
+        if row is None or not hasattr(row, "file_info"):
             return
         info = row.file_info
-        if info.get('is_dir', False):
-            self.navigate_to(info['file_path'])
+        if info.get("is_dir", False):
+            self.navigate_to(info["file_path"])
         else:
-            self.open_file_path(info['file_path'])
+            self.open_file_path(info["file_path"])
 
     def on_open_clicked(self, btn):
-        if hasattr(self, 'selected_file_path') and self.selected_file_path:
+        if hasattr(self, "selected_file_path") and self.selected_file_path:
             self.open_file_path(self.selected_file_path)
 
     def open_file_path(self, file_path):
@@ -539,6 +571,7 @@ class FilesWindow(Adw.ApplicationWindow):
             subprocess.Popen(["xdg-open", file_path])
         except Exception as e:
             from axon_logger import configure_app_logger
+
             logger = configure_app_logger(__name__)
             logger.exception("Error opening file %s: %s", file_path, e)
 
@@ -564,9 +597,7 @@ class FilesWindow(Adw.ApplicationWindow):
 
         # Spawn thread
         self.sync_thread = threading.Thread(
-            target=self._run_scan,
-            args=(scan_roots, progress_cb, done_cb),
-            daemon=True
+            target=self._run_scan, args=(scan_roots, progress_cb, done_cb), daemon=True
         )
         self.sync_thread.start()
 
@@ -578,7 +609,7 @@ class FilesWindow(Adw.ApplicationWindow):
             Path.home() / "Desktop",
             Path.home() / "Pictures",
             Path.home() / "Videos",
-            Path.home() / "Music"
+            Path.home() / "Music",
         ]
         roots = []
         for d in dirs:
@@ -587,7 +618,7 @@ class FilesWindow(Adw.ApplicationWindow):
         # Add files in home root (non-recursive)
         try:
             for entry in Path.home().iterdir():
-                if entry.is_file() and not entry.name.startswith('.'):
+                if entry.is_file() and not entry.name.startswith("."):
                     roots.append(str(entry))
         except Exception:
             pass
@@ -601,9 +632,14 @@ class FilesWindow(Adw.ApplicationWindow):
             done_cb(False, str(e))
 
     def update_sync_progress(self, path, indexed, total):
+        if not self.get_realized():
+            return False
         self.status_lbl.set_text(f"Indexing: {indexed} of {total} | {Path(path).name}")
+        return False
 
     def sync_completed(self, success, err_msg):
+        if not self.get_realized():
+            return False
         self.spinner.stop()
         self.sync_btn.set_sensitive(True)
         if success:
@@ -611,6 +647,7 @@ class FilesWindow(Adw.ApplicationWindow):
             self.refresh_list()
         else:
             self.status_lbl.set_text(f"Indexing failed: {err_msg}")
+        return False
 
     # --- File Operations handlers & helper functions ---
 
@@ -621,12 +658,12 @@ class FilesWindow(Adw.ApplicationWindow):
 
         if is_ctrl:
             if keyname == "c":
-                if row and hasattr(row, 'file_info'):
-                    self.copy_file(row.file_info['file_path'])
+                if row and hasattr(row, "file_info"):
+                    self.copy_file(row.file_info["file_path"])
                     return True
             elif keyname == "x":
-                if row and hasattr(row, 'file_info'):
-                    self.cut_file(row.file_info['file_path'])
+                if row and hasattr(row, "file_info"):
+                    self.cut_file(row.file_info["file_path"])
                     return True
             elif keyname == "v":
                 self.paste_file()
@@ -636,12 +673,12 @@ class FilesWindow(Adw.ApplicationWindow):
                 return True
         else:
             if keyname == "Delete":
-                if row and hasattr(row, 'file_info'):
-                    self.trash_file(row.file_info['file_path'])
+                if row and hasattr(row, "file_info"):
+                    self.trash_file(row.file_info["file_path"])
                     return True
             elif keyname == "F2":
-                if row and hasattr(row, 'file_info'):
-                    self.rename_file(row.file_info['file_path'])
+                if row and hasattr(row, "file_info"):
+                    self.rename_file(row.file_info["file_path"])
                     return True
         return False
 
@@ -665,15 +702,27 @@ class FilesWindow(Adw.ApplicationWindow):
         popover.set_pointing_to(rect)
 
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        box.get_style_context().add_class("sidebar-list") # reusable CSS padding
+        box.get_style_context().add_class("sidebar-list")  # reusable CSS padding
 
         actions = [
             ("Open", "document-open-symbolic", lambda: self.on_file_activated(None, row)),
-            ("Copy", "edit-copy-symbolic", lambda: self.copy_file(row.file_info['file_path'])),
-            ("Cut", "edit-cut-symbolic", lambda: self.cut_file(row.file_info['file_path'])),
-            ("Rename...", "document-properties-symbolic", lambda: self.rename_file(row.file_info['file_path'])),
-            ("Move to Trash", "user-trash-symbolic", lambda: self.trash_file(row.file_info['file_path'])),
-            ("Properties...", "dialog-information-symbolic", lambda: self.show_properties(row.file_info))
+            ("Copy", "edit-copy-symbolic", lambda: self.copy_file(row.file_info["file_path"])),
+            ("Cut", "edit-cut-symbolic", lambda: self.cut_file(row.file_info["file_path"])),
+            (
+                "Rename...",
+                "document-properties-symbolic",
+                lambda: self.rename_file(row.file_info["file_path"]),
+            ),
+            (
+                "Move to Trash",
+                "user-trash-symbolic",
+                lambda: self.trash_file(row.file_info["file_path"]),
+            ),
+            (
+                "Properties...",
+                "dialog-information-symbolic",
+                lambda: self.show_properties(row.file_info),
+            ),
         ]
 
         for label, icon_name, callback in actions:
@@ -719,7 +768,7 @@ class FilesWindow(Adw.ApplicationWindow):
             ("New Folder...", "folder-new-symbolic", lambda: self.create_new_folder_dialog()),
             ("New File...", "document-new-symbolic", lambda: self.create_new_file_dialog()),
             ("Paste", "edit-paste-symbolic", lambda: self.paste_file()),
-            ("Refresh List", "view-refresh-symbolic", lambda: self.refresh_list())
+            ("Refresh List", "view-refresh-symbolic", lambda: self.refresh_list()),
         ]
 
         for label, icon_name, callback in actions:
@@ -751,7 +800,11 @@ class FilesWindow(Adw.ApplicationWindow):
         popover.popup()
 
     def prompt_text_dialog(self, title, label_text, default_text, callback):
-        transient = self.get_root() if hasattr(self, "get_root") and hasattr(self.get_root(), "present") else None
+        transient = (
+            self.get_root()
+            if hasattr(self, "get_root") and hasattr(self.get_root(), "present")
+            else None
+        )
         dialog = Gtk.Dialog(title=title, transient_for=transient, modal=True)
         dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
         dialog.add_button("OK", Gtk.ResponseType.OK)
@@ -786,13 +839,13 @@ class FilesWindow(Adw.ApplicationWindow):
 
     def copy_file(self, path):
         self.clipboard_file = path
-        self.clipboard_action = 'copy'
+        self.clipboard_action = "copy"
         self.status_lbl.set_text(f"Copied: {Path(path).name}")
         self.update_path_bar()
 
     def cut_file(self, path):
         self.clipboard_file = path
-        self.clipboard_action = 'cut'
+        self.clipboard_action = "cut"
         self.status_lbl.set_text(f"Cut: {Path(path).name}")
         self.update_path_bar()
 
@@ -812,13 +865,13 @@ class FilesWindow(Adw.ApplicationWindow):
             dest_path = Path(dest_dir) / f"{src_path.stem}_copy{src_path.suffix}"
 
         try:
-            if self.clipboard_action == 'copy':
+            if self.clipboard_action == "copy":
                 if src_path.is_dir():
                     shutil.copytree(src_path, dest_path)
                 else:
                     shutil.copy2(src_path, dest_path)
                 self.status_lbl.set_text(f"Pasted: {src_path.name}")
-            elif self.clipboard_action == 'cut':
+            elif self.clipboard_action == "cut":
                 shutil.move(str(src_path), str(dest_path))
                 self.status_lbl.set_text(f"Moved: {src_path.name}")
                 self.clipboard_file = None
@@ -830,6 +883,7 @@ class FilesWindow(Adw.ApplicationWindow):
 
     def rename_file(self, path):
         src = Path(path)
+
         def do_rename(new_name):
             if not new_name:
                 return
@@ -840,10 +894,15 @@ class FilesWindow(Adw.ApplicationWindow):
                 self.refresh_list()
             except Exception as e:
                 self.status_lbl.set_text(f"Rename failed: {e}")
+
         self.prompt_text_dialog("Rename", f"Enter new name for '{src.name}':", src.name, do_rename)
 
     def trash_file(self, path):
-        transient = self.get_root() if hasattr(self, "get_root") and hasattr(self.get_root(), "present") else None
+        transient = (
+            self.get_root()
+            if hasattr(self, "get_root") and hasattr(self.get_root(), "present")
+            else None
+        )
         dialog = Gtk.Dialog(title="Move to Trash", transient_for=transient, modal=True)
         dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
         dialog.add_button("Move to Trash", Gtk.ResponseType.OK)
@@ -869,11 +928,13 @@ class FilesWindow(Adw.ApplicationWindow):
                     self.refresh_list()
                 except Exception as e:
                     self.status_lbl.set_text(f"Failed to move to Trash: {e}")
+
         dialog.connect("response", on_response)
         dialog.present()
 
     def create_new_folder_dialog(self):
         dest_dir = self.current_dir or str(Path.home())
+
         def do_create(name):
             if not name:
                 return
@@ -884,10 +945,12 @@ class FilesWindow(Adw.ApplicationWindow):
                 self.refresh_list()
             except Exception as e:
                 self.status_lbl.set_text(f"Failed to create folder: {e}")
+
         self.prompt_text_dialog("New Folder", "Enter folder name:", "Untitled Folder", do_create)
 
     def create_new_file_dialog(self):
         dest_dir = self.current_dir or str(Path.home())
+
         def do_create(name):
             if not name:
                 return
@@ -898,10 +961,15 @@ class FilesWindow(Adw.ApplicationWindow):
                 self.refresh_list()
             except Exception as e:
                 self.status_lbl.set_text(f"Failed to create file: {e}")
+
         self.prompt_text_dialog("New File", "Enter file name:", "untitled.txt", do_create)
 
     def show_properties(self, file_info):
-        transient = self.get_root() if hasattr(self, "get_root") and hasattr(self.get_root(), "present") else None
+        transient = (
+            self.get_root()
+            if hasattr(self, "get_root") and hasattr(self.get_root(), "present")
+            else None
+        )
         dialog = Gtk.Dialog(title="Properties", transient_for=transient, modal=True)
         dialog.add_button("Close", Gtk.ResponseType.CLOSE)
 
@@ -917,15 +985,23 @@ class FilesWindow(Adw.ApplicationWindow):
         grid.set_row_spacing(10)
 
         rows = [
-            ("Name:", file_info['file_name']),
-            ("Type:", file_info.get('file_type', 'Folder' if file_info.get('is_dir') else 'Unknown')),
-            ("Location:", file_info['file_path']),
-            ("Size:", format_size(file_info['file_size']) if file_info['file_size'] is not None else "Folder"),
-            ("Modified:", format_timestamp(file_info['last_modified']))
+            ("Name:", file_info["file_name"]),
+            (
+                "Type:",
+                file_info.get("file_type", "Folder" if file_info.get("is_dir") else "Unknown"),
+            ),
+            ("Location:", file_info["file_path"]),
+            (
+                "Size:",
+                format_size(file_info["file_size"])
+                if file_info["file_size"] is not None
+                else "Folder",
+            ),
+            ("Modified:", format_timestamp(file_info["last_modified"])),
         ]
 
         try:
-            p = Path(file_info['file_path'])
+            p = Path(file_info["file_path"])
             mode = p.stat().st_mode
             perms = stat.filemode(mode)
             rows.append(("Permissions:", perms))
@@ -950,9 +1026,11 @@ class FilesWindow(Adw.ApplicationWindow):
         dialog.connect("response", lambda dlg, resp: dialog.destroy())
         dialog.present()
 
+
 def list_directory_contents(dir_path, indexer):
     """Utility function to list both folders and database files inside a directory."""
     import sqlite3
+
     items = []
     try:
         path_obj = Path(dir_path).expanduser().resolve()
@@ -963,16 +1041,19 @@ def list_directory_contents(dir_path, indexer):
         conn = sqlite3.connect(indexer.db_path, timeout=30.0)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT id, file_path, file_name, file_type, file_size, last_modified, content_summary
             FROM files
             WHERE file_path LIKE ?
-        """, (f"{path_obj}/%",))
-        db_files = {row['file_path']: dict(row) for row in cursor.fetchall()}
+        """,
+            (f"{path_obj}/%",),
+        )
+        db_files = {row["file_path"]: dict(row) for row in cursor.fetchall()}
         conn.close()
 
         for entry in path_obj.iterdir():
-            if entry.name.startswith('.'):
+            if entry.name.startswith("."):
                 continue
 
             entry_str = str(entry)
@@ -983,47 +1064,54 @@ def list_directory_contents(dir_path, indexer):
                 continue
 
             if entry.is_dir():
-                items.append({
-                    'is_dir': True,
-                    'file_path': entry_str,
-                    'file_name': entry.name,
-                    'file_type': 'Folder',
-                    'file_size': None,
-                    'last_modified': mtime,
-                    'content_summary': '',
-                    'similarity': 0.0
-                })
+                items.append(
+                    {
+                        "is_dir": True,
+                        "file_path": entry_str,
+                        "file_name": entry.name,
+                        "file_type": "Folder",
+                        "file_size": None,
+                        "last_modified": mtime,
+                        "content_summary": "",
+                        "similarity": 0.0,
+                    }
+                )
             else:
                 db_rec = db_files.get(entry_str)
                 if db_rec:
-                    items.append({
-                        'is_dir': False,
-                        'file_path': entry_str,
-                        'file_name': entry.name,
-                        'file_type': db_rec['file_type'],
-                        'file_size': db_rec['file_size'],
-                        'last_modified': db_rec['last_modified'],
-                        'content_summary': db_rec['content_summary'],
-                        'similarity': 0.0
-                    })
+                    items.append(
+                        {
+                            "is_dir": False,
+                            "file_path": entry_str,
+                            "file_name": entry.name,
+                            "file_type": db_rec["file_type"],
+                            "file_size": db_rec["file_size"],
+                            "last_modified": db_rec["last_modified"],
+                            "content_summary": db_rec["content_summary"],
+                            "similarity": 0.0,
+                        }
+                    )
                 else:
-                    items.append({
-                        'is_dir': False,
-                        'file_path': entry_str,
-                        'file_name': entry.name,
-                        'file_type': entry.suffix.lower().lstrip('.'),
-                        'file_size': stat.st_size,
-                        'last_modified': mtime,
-                        'content_summary': 'File is not yet indexed (Sync Index)',
-                        'similarity': 0.0
-                    })
+                    items.append(
+                        {
+                            "is_dir": False,
+                            "file_path": entry_str,
+                            "file_name": entry.name,
+                            "file_type": entry.suffix.lower().lstrip("."),
+                            "file_size": stat.st_size,
+                            "last_modified": mtime,
+                            "content_summary": "File is not yet indexed (Sync Index)",
+                            "similarity": 0.0,
+                        }
+                    )
     except Exception as e:
         from axon_logger import configure_app_logger
+
         logger = configure_app_logger(__name__)
         logger.exception("Error listing folder contents: %s", e)
 
-    dirs = [x for x in items if x['is_dir']]
-    files = [x for x in items if not x['is_dir']]
-    dirs.sort(key=lambda x: x['file_name'].lower())
-    files.sort(key=lambda x: x['file_name'].lower())
+    dirs = [x for x in items if x["is_dir"]]
+    files = [x for x in items if not x["is_dir"]]
+    dirs.sort(key=lambda x: x["file_name"].lower())
+    files.sort(key=lambda x: x["file_name"].lower())
     return dirs + files

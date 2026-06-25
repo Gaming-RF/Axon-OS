@@ -37,16 +37,18 @@ class AxonTerminalWindow(Adw.ApplicationWindow):
         self.set_default_size(900, 600)
         self.set_icon_name("utilities-terminal")
 
-        # ---- Load CSS ------------------------------------------------------
-        css_path = Path(__file__).resolve().parent / "main.css"
-        if css_path.exists():
-            css_provider = Gtk.CssProvider()
-            css_provider.load_from_path(str(css_path))
-            Gtk.StyleContext.add_provider_for_display(
-                Gdk.Display.get_default(),
-                css_provider,
-                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
-            )
+        # ---- Load CSS (guard against re-registration) ----------------------
+        if not hasattr(AxonTerminalWindow, "_css_loaded"):
+            css_path = Path(__file__).resolve().parent / "main.css"
+            if css_path.exists():
+                css_provider = Gtk.CssProvider()
+                css_provider.load_from_path(str(css_path))
+                Gtk.StyleContext.add_provider_for_display(
+                    Gdk.Display.get_default(),
+                    css_provider,
+                    Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+                )
+            AxonTerminalWindow._css_loaded = True
 
         # ---- Root layout ---------------------------------------------------
         root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)

@@ -20,9 +20,15 @@ except ImportError:  # running standalone — repo root / installed shim not on 
     except ImportError:
         import logging as _logging
 
-        def configure_app_logger(name, level=_logging.INFO, log_file=None):
+        def configure_app_logger(
+            name: str,
+            level: int = _logging.INFO,
+            log_file: str | None = None,
+            json_output: bool = False,
+        ) -> _logging.Logger:
             _logging.basicConfig(level=level)
             return _logging.getLogger(name)
+
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from constants import AXON_DIR, MAX_CLIPBOARD_ENTRY_LEN, MAX_CLIPBOARD_HISTORY
@@ -39,12 +45,12 @@ class ContextService(dbus.service.Object):
         self.session_bus = dbus.SessionBus()
 
         try:
-            self.bus_name = dbus.service.BusName('org.axonos.Context', bus=self.session_bus)
+            self.bus_name = dbus.service.BusName("org.axonos.Context", bus=self.session_bus)
         except dbus.exceptions.NameExistsException:
             logger.error("org.axonos.Context service is already running.")
             sys.exit(1)
 
-        dbus.service.Object.__init__(self, self.session_bus, '/org/axonos/Context')
+        dbus.service.Object.__init__(self, self.session_bus, "/org/axonos/Context")
 
         # State tracking (updated dynamically by shell extension or helpers)
         self.active_window_title = "None"
@@ -57,11 +63,11 @@ class ContextService(dbus.service.Object):
 
         # Clipboard history with SQLite persistence
         self._clipboard_store = ClipboardStore(
-            max_entries=MAX_CLIPBOARD_HISTORY,
-            max_entry_len=MAX_CLIPBOARD_ENTRY_LEN
+            max_entries=MAX_CLIPBOARD_HISTORY, max_entry_len=MAX_CLIPBOARD_ENTRY_LEN
         )
         self._clipboard_history = self._clipboard_store.to_deque()
         self._clipboard_watcher = None
+        self._clipboard_watch_id = None
         self._config_mtime = 0.0
         self._start_clipboard_watcher()
 
@@ -88,7 +94,7 @@ class ContextService(dbus.service.Object):
     # D-Bus Mutation Methods (Called by Shell Extension / Hooks)
     # ------------------------------------------------------------------
 
-    @dbus.service.method('org.axonos.Context', in_signature='ss', out_signature='b')
+    @dbus.service.method("org.axonos.Context", in_signature="ss", out_signature="b")
     def SetActiveWindow(self, title, app_id):
         """Called by GNOME shell extension when focus changes."""
         self.active_window_title = str(title)
@@ -96,7 +102,7 @@ class ContextService(dbus.service.Object):
         self.ContextChanged(self.GetActiveContext())
         return True
 
-    @dbus.service.method('org.axonos.Context', in_signature='s', out_signature='b')
+    @dbus.service.method("org.axonos.Context", in_signature="s", out_signature="b")
     def SetActiveSpace(self, space_name):
         """Called by GNOME shell extension when space changes."""
         self.active_space = str(space_name)
@@ -107,29 +113,28 @@ class ContextService(dbus.service.Object):
     # D-Bus Query Methods
     # ------------------------------------------------------------------
 
-    @dbus.service.method('org.axonos.Context', in_signature='', out_signature='s')
+    @dbus.service.method("org.axonos.Context", in_signature="", out_signature="s")
     def GetActiveContext(self):
         """Aggregates all current session context into a JSON string."""
         context = {
-            "active_window": {
-                "title": self.active_window_title,
-                "app": self.active_window_app
-            },
+            "active_window": {"title": self.active_window_title, "app": self.active_window_app},
             "active_space": self.active_space,
             "open_files": self._get_open_files(),
             "terminal_commands": self._get_terminal_commands(),
             "last_stderr": self._get_last_stderr(),
-            "clipboard_history": list(self._clipboard_history)
+            "clipboard_history": list(self._clipboard_history),
         }
         return json.dumps(context)
 
-    @dbus.service.method('org.axonos.Context', in_signature='', out_signature='s')
+    @dbus.service.method("org.axonos.Context", in_signature="", out_signature="s")
     def GetContextString(self):
         """Formats context for injection into LLM system prompts."""
         parts = []
 
         if self.active_window_title and self.active_window_title != "None":
-            parts.append(f"Active window: {self.active_window_title} (App: {self.active_window_app})")
+            parts.append(
+                f"Active window: {self.active_window_title} (App: {self.active_window_app})"
+            )
 
         parts.append(f"Current space: {self.active_space}")
 
@@ -161,7 +166,7 @@ class ContextService(dbus.service.Object):
 
         return "\n".join(parts)
 
-    @dbus.service.method('org.axonos.Context', in_signature='s', out_signature='s')
+    @dbus.service.method("org.axonos.Context", in_signature="s", out_signature="s")
     def SemanticSearch(self, query_text):
         """Performs vector search in the indexed documents using sqlite-vec."""
         conn = None
@@ -172,8 +177,8 @@ class ContextService(dbus.service.Object):
             import sqlite_vec
 
             # 1. Fetch embedding of query_text via Brain service
-            brain_obj = self.session_bus.get_object('org.axonos.Brain', '/org/axonos/Brain')
-            brain_interface = dbus.Interface(brain_obj, 'org.axonos.Brain')
+            brain_obj = self.session_bus.get_object("org.axonos.Brain", "/org/axonos/Brain")
+            brain_interface = dbus.Interface(brain_obj, "org.axonos.Brain")
             emb_json = brain_interface.GetEmbeddings(query_text, "")
             emb = json.loads(emb_json)
             if not emb or len(emb) != 768:
@@ -188,24 +193,23 @@ class ContextService(dbus.service.Object):
             sqlite_vec.load(conn)
 
             cursor = conn.cursor()
-            emb_bytes = array('f', emb).tobytes()
+            emb_bytes = array("f", emb).tobytes()
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT f.path, f.content, vec.distance
                 FROM vec_items vec
                 JOIN files f ON f.id = vec.rowid
                 WHERE vec_embedding MATCH ?
                 ORDER BY distance
                 LIMIT 5
-            """, (emb_bytes,))
+            """,
+                (emb_bytes,),
+            )
 
             results = []
             for row in cursor.fetchall():
-                results.append({
-                    "path": row[0],
-                    "content": row[1],
-                    "distance": row[2]
-                })
+                results.append({"path": row[0], "content": row[1], "distance": row[2]})
             return json.dumps(results)
         except Exception as e:
             return json.dumps({"error": str(e)})
@@ -217,7 +221,7 @@ class ContextService(dbus.service.Object):
     # D-Bus Signals
     # ------------------------------------------------------------------
 
-    @dbus.service.signal('org.axonos.Context', signature='s')
+    @dbus.service.signal("org.axonos.Context", signature="s")
     def ContextChanged(self, context_json):
         """Fires when any critical context parameter changes."""
         pass
@@ -242,11 +246,12 @@ class ContextService(dbus.service.Object):
                 stderr=subprocess.DEVNULL,
             )
             # Read clipboard changes in a GLib IO watch
-            GLib.io_add_watch(
-                self._clipboard_watcher.stdout.fileno(),
-                GLib.IO_IN | GLib.IO_HUP,
-                self._on_clipboard_data,
-            )
+            if self._clipboard_watcher.stdout is not None:
+                self._clipboard_watch_id = GLib.io_add_watch(
+                    self._clipboard_watcher.stdout.fileno(),
+                    GLib.IO_IN | GLib.IO_HUP,
+                    self._on_clipboard_data,
+                )
             logger.info("Clipboard watcher started (Wayland/wl-paste)")
             return
         except FileNotFoundError:
@@ -258,6 +263,25 @@ class ContextService(dbus.service.Object):
         self._last_xclip_content = ""
         GLib.timeout_add_seconds(2, self._poll_xclip)
         logger.info("Clipboard watcher started (X11/xclip polling)")
+
+    def cleanup(self):
+        """Terminate the clipboard watcher subprocess on shutdown."""
+        if self._clipboard_watcher is not None:
+            try:
+                self._clipboard_watcher.terminate()
+                self._clipboard_watcher.wait(timeout=2)
+            except Exception:
+                try:
+                    self._clipboard_watcher.kill()
+                except Exception:
+                    pass
+            self._clipboard_watcher = None
+        if self._clipboard_watch_id is not None:
+            try:
+                GLib.source_remove(self._clipboard_watch_id)
+            except Exception:
+                pass
+            self._clipboard_watch_id = None
 
     def _on_clipboard_data(self, fd, condition):
         """GLib IO callback for wl-paste --watch output."""
@@ -287,7 +311,9 @@ class ContextService(dbus.service.Object):
         try:
             result = subprocess.run(
                 ["xclip", "-selection", "clipboard", "-o"],
-                capture_output=True, text=True, timeout=1,
+                capture_output=True,
+                text=True,
+                timeout=1,
             )
             text = result.stdout.strip()
             if text:
@@ -361,8 +387,14 @@ class ContextService(dbus.service.Object):
         bash_history = Path.home() / ".bash_history"
         if bash_history.exists():
             try:
-                lines = bash_history.read_text(errors="replace").splitlines()
-                commands = [line.strip() for line in lines if line.strip() and not line.startswith("#")]
+                commands = []
+                with open(bash_history, errors="replace") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith("#"):
+                            commands.append(line)
+                            if len(commands) > n * 2:
+                                commands = commands[-n:]
                 return commands[-n:]
             except Exception as e:
                 logger.debug("Failed to read bash history: %s", e)
@@ -371,19 +403,21 @@ class ContextService(dbus.service.Object):
         zsh_history = Path.home() / ".zsh_history"
         if zsh_history.exists():
             try:
-                lines = zsh_history.read_text(errors="replace").splitlines()
                 commands = []
-                for line in lines:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    # Extended history format: `: <timestamp>:0;command`
-                    match = re.match(r"^:\s*\d+:\d+;(.+)$", line)
-                    if match:
-                        commands.append(match.group(1))
-                    else:
-                        # Plain history format (non-extended)
-                        commands.append(line)
+                with open(zsh_history, errors="replace") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        # Extended history format: `: <timestamp>:<duration>;command`
+                        # Also handles 4-field format: `: <timestamp>:<duration>:<event>;command`
+                        match = re.match(r"^:\s*\d+:\d+(?::\d+)?;(.+)$", line)
+                        if match:
+                            commands.append(match.group(1))
+                        else:
+                            commands.append(line)
+                        if len(commands) > n * 2:
+                            commands = commands[-n:]
                 return commands[-n:]
             except Exception as e:
                 logger.debug("Failed to read zsh history: %s", e)
@@ -409,7 +443,8 @@ class ContextService(dbus.service.Object):
             logger.debug("Failed to read last_stderr: %s", e)
         return None
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     loop = GLib.MainLoop()
     service = ContextService()
     try:
@@ -417,4 +452,6 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         logger = configure_app_logger(__name__)
         logger.info("Stopping Axon Context service...")
+    finally:
+        service.cleanup()
         loop.quit()

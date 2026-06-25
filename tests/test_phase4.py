@@ -55,11 +55,13 @@ class TestAIRouter:
     def test_select_model_auto(self):
         from services.axon_brain.ai_router import AIRouter
 
-        router = AIRouter({
-            "speed_model": "fast",
-            "general_model": "gen",
-            "deep_model": "deep",
-        })
+        router = AIRouter(
+            {
+                "speed_model": "fast",
+                "general_model": "gen",
+                "deep_model": "deep",
+            }
+        )
         model, _reason = router.select_model("hi")
         assert model == "fast"
 
@@ -168,7 +170,8 @@ class TestModelMarketplace:
         from services.axon_brain.model_marketplace import DEFAULT_CATALOG
 
         results = [
-            m for m in DEFAULT_CATALOG
+            m
+            for m in DEFAULT_CATALOG
             if "code" in m["name"].lower() or "code" in " ".join(m.get("tags", []))
         ]
         assert len(results) >= 1

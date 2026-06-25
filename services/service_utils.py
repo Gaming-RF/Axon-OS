@@ -16,18 +16,49 @@ import dbus
 logger = logging.getLogger(__name__)
 
 ALLOWED_COMMANDS: set[str] = {
-    "ls", "cat", "grep", "find", "echo", "date", "whoami", "hostname",
-    "uname", "df", "du", "free", "uptime", "ps", "top", "htop",
-    "pwd", "wc", "head", "tail", "sort", "uniq", "diff", "file",
-    "stat", "readlink", "realpath", "basename", "dirname",
+    "ls",
+    "cat",
+    "grep",
+    "find",
+    "echo",
+    "date",
+    "whoami",
+    "hostname",
+    "uname",
+    "df",
+    "du",
+    "free",
+    "uptime",
+    "ps",
+    "top",
+    "htop",
+    "pwd",
+    "wc",
+    "head",
+    "tail",
+    "sort",
+    "uniq",
+    "diff",
+    "file",
+    "stat",
+    "readlink",
+    "realpath",
+    "basename",
+    "dirname",
     # NOTE: python/node/bash/sh intentionally excluded — they can execute
     # arbitrary code, defeating the purpose of the allowlist.
-    "apt", "apt-get", "dpkg", "snap", "flatpak",
-    "git", "make", "gcc", "g++", "cargo", "rustc",
-    "systemctl", "journalctl",
-    "nmcli", "bluetoothctl", "pactl", "paplay",
-    "xdg-open", "gtk-launch", "gio",
-    "notify-send", "zenity",
+    # NOTE: apt/apt-get/dpkg/snap/flatpak/systemctl/g++/gcc/cargo/rustc/git
+    # intentionally excluded — they can modify the system, install packages,
+    # manage services, or compile arbitrary code.
+    "nmcli",
+    "bluetoothctl",
+    "pactl",
+    "paplay",
+    "xdg-open",
+    "gtk-launch",
+    "gio",
+    "notify-send",
+    "zenity",
 }
 
 _SHELL_META_CHARS = frozenset("|;&$`\\(){}[]<>*?~!#")
@@ -48,7 +79,9 @@ def safe_exec(command: str, **kwargs: Any) -> subprocess.Popen | None:
         Popen object if command was allowed and started, None otherwise.
     """
     if any(c in command for c in _SHELL_META_CHARS):
-        logger.warning("safe_exec: blocked command containing shell metacharacters: %s", command[:100])
+        logger.warning(
+            "safe_exec: blocked command containing shell metacharacters: %s", command[:100]
+        )
         return None
 
     try:
@@ -66,7 +99,7 @@ def safe_exec(command: str, **kwargs: Any) -> subprocess.Popen | None:
         logger.warning("safe_exec: blocked unwhitelisted command: %s", binary)
         return None
 
-    defaults = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
+    defaults: dict[str, Any] = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
     defaults.update(kwargs)
     return subprocess.Popen(parts, **defaults)
 
@@ -82,6 +115,7 @@ def error_response(message: str, code: str = "UNKNOWN") -> str:
         JSON string with error and code fields.
     """
     import json
+
     return json.dumps({"error": message, "code": code})
 
 
@@ -161,8 +195,7 @@ class RateLimiter:
         with self._lock:
             # Clean old requests
             self.requests[identifier] = [
-                req_time for req_time in self.requests[identifier]
-                if req_time > cutoff
+                req_time for req_time in self.requests[identifier] if req_time > cutoff
             ]
 
             # Check limit
@@ -193,7 +226,9 @@ def cached(ttl_seconds: int = 300) -> Callable:
             result = func(self, *args, **kwargs)
             cache.set(cache_key, result)
             return result
+
         return wrapper
+
     return decorator
 
 
@@ -213,19 +248,16 @@ def rate_limited(rate: int = 100, window_seconds: int = 60) -> Callable:
         @functools.wraps(func)
         def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
             from axon_logger import configure_app_logger
+
             logger = configure_app_logger(__name__)
 
             # Use sender info if available from D-Bus context
-            identifier = getattr(self, 'sender', 'default')
+            identifier = getattr(self, "sender", "default")
             if not limiter.allow(identifier):
-                logger.warning(
-                    "Rate limit exceeded for %s calling %s",
-                    identifier,
-                    func.__name__
-                )
-                raise dbus.exceptions.DBusException(
-                    f"Rate limit exceeded for {func.__name__}"
-                )
+                logger.warning("Rate limit exceeded for %s calling %s", identifier, func.__name__)
+                raise dbus.exceptions.DBusException(f"Rate limit exceeded for {func.__name__}")
             return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator

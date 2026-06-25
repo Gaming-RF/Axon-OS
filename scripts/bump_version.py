@@ -5,6 +5,7 @@ Usage:
 
 This updates the `version` field in `pyproject.toml` and optionally updates other files.
 """
+
 import re
 import sys
 from pathlib import Path
@@ -26,7 +27,7 @@ if "version" not in text:
     print("pyproject.toml does not contain a version field to update")
     sys.exit(1)
 
-new_text, count = re.subn(r'(?m)^(version\s*=\s*")([^"]+)(")', rf'\1{new_version}\3', text)
+new_text, count = re.subn(r'(?m)^(version\s*=\s*")([^"]+)(")', rf"\1{new_version}\3", text)
 if count == 0:
     print("Failed to update version in pyproject.toml")
     sys.exit(1)

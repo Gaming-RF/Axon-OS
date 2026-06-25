@@ -24,7 +24,7 @@ class ContextReader:
     def _connect(self) -> None:
         if self.context_obj is None:
             try:
-                self.context_obj = self.bus.get_object('org.axonos.Context', '/org/axonos/Context')
+                self.context_obj = self.bus.get_object("org.axonos.Context", "/org/axonos/Context")
             except Exception:
                 self.context_obj = None
 

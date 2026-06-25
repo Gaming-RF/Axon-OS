@@ -8,8 +8,16 @@ from typing import Any
 # Filler tokens whisper emits for silence / noise; a transcript that is only
 # these is discarded instead of being sent to the Brain.
 _NOISE_TRANSCRIPTS = {
-    "", ".", "you", "thank you.", "thanks for watching!", "[blank_audio]",
-    "[music]", "(music)", "uh", "um",
+    "",
+    ".",
+    "you",
+    "thank you.",
+    "thanks for watching!",
+    "[blank_audio]",
+    "[music]",
+    "(music)",
+    "uh",
+    "um",
 }
 
 

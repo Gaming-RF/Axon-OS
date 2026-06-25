@@ -36,9 +36,19 @@ DANGEROUS_HINTS = (
     "wget ",
     "| sh",
     "| bash",
+    "| python",
+    "| perl",
+    "| ruby",
     "rm -rf",
+    "rm -r -f",
+    "rm -fr",
     "chmod 777",
+    "chmod +s",
     "sudo ",
+    "doas ",
+    "mkfs.",
+    "dd if=",
+    "> /dev/sd",
 )
 
 
@@ -63,16 +73,17 @@ def assess_command(command: str) -> SafetyDecision:
         lowered = command.lower()
         if any(hint in lowered for hint in DANGEROUS_HINTS):
             risk = "medium"
-            findings = [{
-                "line": 1,
-                "severity": "medium",
-                "description": "Suspicious shell pattern",
-                "snippet": command[:160],
-            }]
+            findings = [
+                {
+                    "line": 1,
+                    "severity": "medium",
+                    "description": "Suspicious shell pattern",
+                    "snippet": command[:160],
+                }
+            ]
 
     return SafetyDecision(
         risk=risk,
         findings=findings,
         sandbox_recommended=risk in {"medium", "high"},
     )
-
