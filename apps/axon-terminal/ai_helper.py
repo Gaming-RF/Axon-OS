@@ -151,13 +151,17 @@ class AIHelper:
             "wrap it in a code block."
         )
         context = self._get_context_string()
+        brain = self._brain
         try:
-            if self._brain is None:
+            if brain is None:
                 logger.warning("AI diagnosis requested but Brain is not connected")
                 GLib.idle_add(callback, "⚠ AI diagnosis unavailable — Brain service is offline.")
                 return
-            result = str(self._brain.Generate(prompt, context, "", False))
+            result = str(brain.Generate(prompt, context, "", False))
             GLib.idle_add(callback, result)
+        except dbus.exceptions.DBusException:
+            logger.warning("AI diagnosis: Brain proxy became stale")
+            GLib.idle_add(callback, "⚠ AI diagnosis unavailable — Brain service is offline.")
         except Exception as exc:
             logger.exception("AI diagnosis failed: %s", exc)
             GLib.idle_add(callback, f"⚠ AI diagnosis failed: {exc}")
@@ -200,18 +204,22 @@ class AIHelper:
             "If the request is ambiguous, pick the most common interpretation."
         )
         context = self._get_context_string()
+        brain = self._brain
         try:
-            if self._brain is None:
+            if brain is None:
                 logger.warning("Translate requested but Brain is not connected")
                 GLib.idle_add(callback, "")
                 return
-            result = str(self._brain.Generate(prompt, context, "", False)).strip()
+            result = str(brain.Generate(prompt, context, "", False)).strip()
             # Strip any accidental backtick wrapping
             if result.startswith("```") and result.endswith("```"):
                 result = result[3:-3].strip()
             if result.startswith("`") and result.endswith("`"):
                 result = result[1:-1].strip()
             GLib.idle_add(callback, result)
+        except dbus.exceptions.DBusException:
+            logger.warning("Translate: Brain proxy became stale")
+            GLib.idle_add(callback, "")
         except Exception:
             logger.exception("Translate to command failed")
             GLib.idle_add(callback, "")
@@ -258,15 +266,19 @@ class AIHelper:
             'strings, e.g. ["cmd1", "cmd2"]. No other text.'
         )
         context = self._get_context_string()
+        brain = self._brain
         try:
-            if self._brain is None:
+            if brain is None:
                 logger.warning("Suggestions requested but Brain is not connected")
                 GLib.idle_add(callback, [])
                 return
-            raw = str(self._brain.Generate(prompt, context, "", False)).strip()
+            raw = str(brain.Generate(prompt, context, "", False)).strip()
             # Try to parse JSON array from the response
             suggestions = self._parse_suggestions(raw)
             GLib.idle_add(callback, suggestions)
+        except dbus.exceptions.DBusException:
+            logger.warning("Suggestions: Brain proxy became stale")
+            GLib.idle_add(callback, [])
         except Exception:
             logger.exception("Suggestion generation failed")
             GLib.idle_add(callback, [])

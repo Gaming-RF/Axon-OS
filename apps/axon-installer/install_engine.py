@@ -34,6 +34,7 @@ import re
 import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 TARGET = "/target"
 MIN_INSTALL_MIB = 16384  # 16 GiB minimum for the root partition
@@ -531,7 +532,7 @@ def strip_live_artifacts() -> None:
         if os.path.exists(full):
             os.remove(full)
     # Fresh machine identity on first boot
-    open(f"{TARGET}/etc/machine-id", "w").close()
+    Path(f"{TARGET}/etc/machine-id").write_text("")
 
 
 def install_bootloader(disk: str, mode: str) -> None:
@@ -713,11 +714,17 @@ def main() -> int:
         fail("the install engine must run as root")
 
     try:
-        with open(sys.argv[1]) as f:
+        config_path = sys.argv[1]
+        with open(config_path) as f:
             cfg = json.load(f)
     except (OSError, json.JSONDecodeError) as exc:
         fail(f"could not read config: {exc}")
         return 1
+
+    try:
+        os.unlink(config_path)
+    except OSError:
+        pass
 
     problems = validate_config(cfg)
     if problems:

@@ -168,8 +168,10 @@ class UserSetupPage(Gtk.Box):
             return "Hostname cannot be empty."
         if not re.match(r"^[a-zA-Z0-9]([a-zA-Z0-9.-]{0,61}[a-zA-Z0-9])?$", v["hostname"]):
             return "Hostname must be a valid RFC 1123 name (letters, digits, hyphens, dots)."
-        if v["timezone"] and not re.match(r"^[A-Za-z0-9_/-]+$", v["timezone"]):
-            return "Timezone must contain only letters, digits, underscores, hyphens, and slashes."
+        if v["timezone"] and (
+            ".." in v["timezone"] or not re.match(r"^[A-Za-z0-9_/.-]+$", v["timezone"])
+        ):
+            return "Invalid timezone format."
         if v["keymap"] and not re.match(r"^[A-Za-z0-9_-]+$", v["keymap"]):
             return "Keymap must contain only letters, digits, underscores, and hyphens."
         return None
@@ -565,22 +567,22 @@ class InstallerApp(Adw.ApplicationWindow):
                         return []
 
                     def partition_disk(self, dev, mode):
-                        return True
+                        raise RuntimeError("Partitioner not available")
 
                     def partition_alongside(self, dev, pnum, sz):
-                        return 3
+                        raise RuntimeError("Partitioner not available")
 
                     def format_partitions(self, dev):
-                        pass
+                        raise RuntimeError("Partitioner not available")
 
                     def format_partitions_alongside(self, dev, rnum):
-                        pass
+                        raise RuntimeError("Partitioner not available")
 
                     def mount_partitions(self, dev, mnt):
-                        pass
+                        raise RuntimeError("Partitioner not available")
 
                     def mount_partitions_alongside(self, dev, enum, rnum, mnt):
-                        pass
+                        raise RuntimeError("Partitioner not available")
 
                 part = MockPartitioner()
             else:
@@ -671,6 +673,7 @@ class InstallerApp(Adw.ApplicationWindow):
                             "--exclude=/lost+found",
                             "--exclude=/cdrom/*",
                             "--exclude=/boot/*",
+                            "--exclude=/home/*",
                             "/",
                             mount + "/",
                         ],
@@ -780,11 +783,17 @@ class InstallerApp(Adw.ApplicationWindow):
 
             self._set_progress(0.85, "Creating swapfile…")
             if not part.dry_run:
+                subprocess.run(["chroot", mount, "chattr", "+C", "/swapfile"], check=False)
                 subprocess.run(["chroot", mount, "fallocate", "-l", "2G", "/swapfile"], check=False)
                 subprocess.run(["chroot", mount, "chmod", "600", "/swapfile"], check=False)
                 subprocess.run(["chroot", mount, "mkswap", "/swapfile"], check=False)
-                with open(os.path.join(mount, "etc", "fstab"), "a") as f:
-                    f.write("/swapfile none swap sw 0 0\n")
+                fstab_path = os.path.join(mount, "etc", "fstab")
+                existing = ""
+                if os.path.exists(fstab_path):
+                    existing = open(fstab_path).read()
+                if "/swapfile" not in existing:
+                    with open(fstab_path, "a") as f:
+                        f.write("/swapfile none swap sw 0 0\n")
 
             self._set_progress(0.90, "Installing bootloader (configuring dual boot GRUB)…")
             if not part.dry_run:
@@ -822,11 +831,11 @@ class InstallerApp(Adw.ApplicationWindow):
                 finally:
                     # Unmount virtual filesystems
                     if mount_efivars:
-                        subprocess.run(["umount", "-l", efi_vars_dest], check=True)
-                    subprocess.run(["umount", "-l", os.path.join(mount, "dev")], check=True)
-                    subprocess.run(["umount", "-l", os.path.join(mount, "proc")], check=True)
-                    subprocess.run(["umount", "-l", os.path.join(mount, "sys")], check=True)
-                    subprocess.run(["umount", "-l", os.path.join(mount, "run")], check=True)
+                        subprocess.run(["umount", "-l", efi_vars_dest], check=False)
+                    subprocess.run(["umount", "-l", os.path.join(mount, "dev")], check=False)
+                    subprocess.run(["umount", "-l", os.path.join(mount, "proc")], check=False)
+                    subprocess.run(["umount", "-l", os.path.join(mount, "sys")], check=False)
+                    subprocess.run(["umount", "-l", os.path.join(mount, "run")], check=False)
 
             self._set_progress(1.00, "Installation complete!")
             GLib.idle_add(self._show_done_dialog)

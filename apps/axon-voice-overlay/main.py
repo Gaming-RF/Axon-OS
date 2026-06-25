@@ -28,23 +28,27 @@ class VoiceOverlay(Gtk.ApplicationWindow):
         # Phase offset for animation
         self.phase = 0.0
 
-        # Set up CSS to make the window background completely transparent
-        css_provider = Gtk.CssProvider()
-        css_provider.load_from_data(
-            """
-            window {
-                background-color: transparent;
-                background: transparent;
-            }
-        """,
-            -1,
-        )
-        Gtk.StyleContext.add_provider_for_display(
-            Gdk.Display.get_default(), css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-        )
+        if not hasattr(VoiceOverlay, "_css_loaded"):
+            css_provider = Gtk.CssProvider()
+            css_provider.load_from_data(
+                """
+                window {
+                    background-color: transparent;
+                    background: transparent;
+                }
+            """,
+                -1,
+            )
+            Gtk.StyleContext.add_provider_for_display(
+                Gdk.Display.get_default(), css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+            )
+            VoiceOverlay._css_loaded = True
 
         # Animation loop (60 FPS)
-        GLib.timeout_add(16, self.on_tick)
+        self._timer_id = GLib.timeout_add(16, self.on_tick)
+        self.connect(
+            "destroy", lambda _: GLib.source_remove(self._timer_id) if self._timer_id else None
+        )
 
         # Center the window at the bottom of the screen
         self.present()

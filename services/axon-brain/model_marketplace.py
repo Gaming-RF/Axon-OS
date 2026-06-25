@@ -277,7 +277,11 @@ class ModelMarketplaceService(dbus.service.Object):
                 {"name": model_name},
                 timeout=10.0,
             )
-            return resp is not None and resp.status == 200
+            try:
+                return resp is not None and resp.status == 200
+            finally:
+                if resp is not None:
+                    resp.close()
         except Exception:
             return False
 
@@ -361,29 +365,33 @@ class ModelMarketplaceService(dbus.service.Object):
     def _do_pull(self, model_name):
         try:
             resp = _http_post(f"{OLLAMA_BASE_URL}/api/pull", {"name": model_name})
-            if resp:
-                for raw_line in resp:
-                    line = raw_line.decode().strip()
-                    if not line:
-                        continue
-                    data = json.loads(line)
-                    status = data.get("status", "")
-                    completed = data.get("completed", 0)
-                    total = data.get("total", 0)
-                    progress = int(completed / total * 100) if total > 0 else -1
-                    self.PullProgress(model_name, status, progress)
+            try:
+                if resp:
+                    for raw_line in resp:
+                        line = raw_line.decode().strip()
+                        if not line:
+                            continue
+                        data = json.loads(line)
+                        status = data.get("status", "")
+                        completed = data.get("completed", 0)
+                        total = data.get("total", 0)
+                        progress = int(completed / total * 100) if total > 0 else -1
+                        self.PullProgress(model_name, status, progress)
+                        with self._lock:
+                            if model_name in self._downloads:
+                                self._downloads[model_name]["status"] = status
+                                self._downloads[model_name]["progress"] = progress
                     with self._lock:
                         if model_name in self._downloads:
-                            self._downloads[model_name]["status"] = status
-                            self._downloads[model_name]["progress"] = progress
-                with self._lock:
-                    if model_name in self._downloads:
-                        self._downloads[model_name]["status"] = "completed"
-                        self._downloads[model_name]["progress"] = 100
-            else:
-                with self._lock:
-                    if model_name in self._downloads:
-                        self._downloads[model_name]["status"] = "error"
+                            self._downloads[model_name]["status"] = "completed"
+                            self._downloads[model_name]["progress"] = 100
+                else:
+                    with self._lock:
+                        if model_name in self._downloads:
+                            self._downloads[model_name]["status"] = "error"
+            finally:
+                if resp is not None:
+                    resp.close()
         except Exception as e:
             with self._lock:
                 if model_name in self._downloads:
@@ -400,17 +408,19 @@ class ModelMarketplaceService(dbus.service.Object):
                 result = json.loads(CATALOG_FILE.read_text())
                 if isinstance(result, list):
                     return result
-            except Exception:
-                pass
+            except Exception as e:
+                log.warning("Catalog file unreadable, resetting to defaults: %s", e)
         self._save_catalog(DEFAULT_CATALOG)
         return DEFAULT_CATALOG
 
     def _save_catalog(self, catalog: list) -> None:
         try:
             AXON_DIR.mkdir(parents=True, exist_ok=True)
-            CATALOG_FILE.write_text(json.dumps(catalog, indent=2))
-        except Exception:
-            pass
+            tmp = CATALOG_FILE.with_suffix(".tmp")
+            tmp.write_text(json.dumps(catalog, indent=2))
+            tmp.replace(CATALOG_FILE)
+        except Exception as e:
+            log.warning("Failed to save catalog: %s", e)
 
     def _find_in_catalog(self, name: str) -> dict | None:
         for m in self._catalog:

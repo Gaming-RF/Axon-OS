@@ -43,6 +43,8 @@ logger = configure_app_logger(__name__)
 def format_size(size_in_bytes):
     if size_in_bytes is None:
         return ""
+    if size_in_bytes < 0:
+        return "Unknown"
     for unit in ["B", "KB", "MB", "GB", "TB"]:
         if size_in_bytes < 1024.0:
             return f"{size_in_bytes:.1f} {unit}" if unit != "B" else f"{size_in_bytes} B"
@@ -332,13 +334,15 @@ class FileIndexer:
             conn = sqlite3.connect(self.db_path, timeout=30.0)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            cursor.execute("""
-                SELECT id, file_path, file_name, file_type, file_size, last_modified, content_summary, embedding
-                FROM files
-                WHERE embedding IS NOT NULL
-            """)
-            rows = cursor.fetchall()
-            conn.close()
+            try:
+                cursor.execute("""
+                    SELECT id, file_path, file_name, file_type, file_size, last_modified, content_summary, embedding
+                    FROM files
+                    WHERE embedding IS NOT NULL
+                """)
+                rows = cursor.fetchall()
+            finally:
+                conn.close()
 
             results = []
             for row in rows:
@@ -368,12 +372,13 @@ class FileIndexer:
             conn = sqlite3.connect(self.db_path, timeout=30.0)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            query_like = f"%{query_text}%"
+            escaped_query = query_text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            query_like = f"%{escaped_query}%"
             cursor.execute(
                 """
                 SELECT id, file_path, file_name, file_type, file_size, last_modified, content_summary
                 FROM files
-                WHERE file_name LIKE ? OR file_path LIKE ? OR content_summary LIKE ?
+                WHERE file_name LIKE ? ESCAPE '\\' OR file_path LIKE ? ESCAPE '\\' OR content_summary LIKE ? ESCAPE '\\'
                 ORDER BY last_modified DESC
                 LIMIT ?
             """,

@@ -164,15 +164,16 @@ class ConversationStore:
         with self._lock:
             conn = self._get_connection()
             try:
+                safe_query = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
                 cursor = conn.execute(
                     """
                     SELECT m.conversation_id, c.title as conversation_title, m.role, m.content, m.timestamp
                     FROM messages m
                     JOIN conversations c ON m.conversation_id = c.id
-                    WHERE m.content LIKE ?
+                    WHERE m.content LIKE ? ESCAPE '\\'
                     ORDER BY m.timestamp DESC
                 """,
-                    (f"%{query}%",),
+                    (f"%{safe_query}%",),
                 )
                 return [dict(row) for row in cursor.fetchall()]
             finally:

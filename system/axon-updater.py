@@ -164,7 +164,7 @@ class AxonUpdaterWindow(Adw.ApplicationWindow):
     def _on_start_clicked(self, _btn: Gtk.Button) -> None:
         self._btn.set_sensitive(False)
         self._set_progress(0.0)
-        threading.Thread(target=self._update_process, daemon=True).start()
+        threading.Thread(target=self._update_process, daemon=False).start()
 
     # ---- update pipeline ------------------------------------------------
 
@@ -187,7 +187,15 @@ class AxonUpdaterWindow(Adw.ApplicationWindow):
         # Phase 2 — APT
         self._set_phase("Phase 2 / 4")
         self._set_status("Updating System Packages (APT)…", 0.35)
-        self._run_cmd(["apt-get", "update"])
+        if not self._run_cmd(["apt-get", "update"]):
+            self._set_status("Update Failed: apt-get update returned an error.", 0.0)
+            self._set_phase("")
+            self._progress_remove_add("error")
+            GLib.idle_add(
+                self._show_error_dialog, "Failed to update package lists. Check terminal logs."
+            )
+            GLib.idle_add(self._btn.set_sensitive, True)
+            return
         self._set_progress(0.45)
 
         self._set_status("Installing System Upgrades…", 0.50)
@@ -198,7 +206,9 @@ class AxonUpdaterWindow(Adw.ApplicationWindow):
             self._set_status("Update Failed.", 0.0)
             self._set_phase("")
             self._progress_remove_add("error")
-            GLib.idle_add(self._show_error_dialog, "System package update failed. Check terminal logs.")
+            GLib.idle_add(
+                self._show_error_dialog, "System package update failed. Check terminal logs."
+            )
             GLib.idle_add(self._btn.set_sensitive, True)
             return
         self._set_progress(0.70)
@@ -214,7 +224,8 @@ class AxonUpdaterWindow(Adw.ApplicationWindow):
         # Phase 4 — GRUB
         self._set_phase("Phase 4 / 4")
         self._set_status("Updating Bootloader…", 0.95)
-        self._run_cmd(["update-grub"])
+        if not self._run_cmd(["update-grub"]):
+            logger.error("update-grub failed — bootloader configuration may be stale")
 
         # Done
         self._set_progress(1.0)
@@ -252,10 +263,12 @@ class AxonUpdaterWindow(Adw.ApplicationWindow):
 
     def _progress_remove_add(self, css_class: str) -> None:
         """Remove all state classes then add *css_class*."""
+
         def _apply():
             for cls in ("complete", "error"):
                 self._progress.remove_css_class(cls)
             self._progress.add_css_class(css_class)
+
         GLib.idle_add(_apply)
 
 

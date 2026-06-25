@@ -12,6 +12,7 @@ Provides:
 from __future__ import annotations
 
 import os
+import shlex
 
 import gi
 
@@ -273,7 +274,7 @@ class TerminalWidget(Gtk.Box):
                 shell = config_path.read_text().strip()
             except Exception:
                 pass
-        if not shell or not Path(shell).exists():
+        if not Path(shell).exists() or not os.access(shell, os.X_OK):
             shell = os.environ.get("SHELL", "/bin/bash")
 
         term.spawn_async(
@@ -574,7 +575,9 @@ class TerminalWidget(Gtk.Box):
                         )
                         self.new_tab("Sandbox")
                         self._tabs[-1].terminal.feed_child(
-                            (f"python3 '{shield_script}' --yes-sandbox '{tmp}'\n").encode()
+                            (
+                                f"python3 {shlex.quote(str(shield_script))} --yes-sandbox {shlex.quote(str(tmp))}\n"
+                            ).encode()
                         )
                         return
                     except Exception:
