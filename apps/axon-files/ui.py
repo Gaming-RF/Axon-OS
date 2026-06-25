@@ -1041,16 +1041,18 @@ def list_directory_contents(dir_path, indexer):
         conn = sqlite3.connect(indexer.db_path, timeout=30.0)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        cursor.execute(
-            """
-            SELECT id, file_path, file_name, file_type, file_size, last_modified, content_summary
-            FROM files
-            WHERE file_path LIKE ?
-        """,
-            (f"{path_obj}/%",),
-        )
-        db_files = {row["file_path"]: dict(row) for row in cursor.fetchall()}
-        conn.close()
+        try:
+            cursor.execute(
+                """
+                SELECT id, file_path, file_name, file_type, file_size, last_modified, content_summary
+                FROM files
+                WHERE file_path LIKE ?
+            """,
+                (f"{path_obj}/%",),
+            )
+            db_files = {row["file_path"]: dict(row) for row in cursor.fetchall()}
+        finally:
+            conn.close()
 
         for entry in path_obj.iterdir():
             if entry.name.startswith("."):

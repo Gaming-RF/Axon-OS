@@ -29,6 +29,9 @@ RUN pip install --no-cache-dir -r requirements-docker.txt
 
 ENV AXON_SERVICE=brain
 
+RUN useradd --create-home --shell /bin/bash axon
+USER axon
+
 CMD ["sh", "-c", "\
   case \"$AXON_SERVICE\" in \
     brain)        python3 services/axon-brain/brain_service.py ;; \

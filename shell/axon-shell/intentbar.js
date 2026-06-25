@@ -290,7 +290,15 @@ export default class IntentBar {
                     this._setResponse('Blocked: unsafe app name.');
                     return;
                 }
-                GLib.spawn_command_line_async(`gtk-launch ${appName}`);
+                try {
+                    let proc = new Gio.Subprocess({
+                        argv: ['gtk-launch', appName],
+                        flags: Gio.SubprocessFlags.NONE
+                    });
+                    proc.init(null);
+                } catch(e) {
+                    log(`Failed to launch ${appName}: ${e.message}`);
+                }
                 this._setResponse(`Opening ${appName}…`);
                 GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1200, () => {
                     this.hide();
@@ -301,7 +309,18 @@ export default class IntentBar {
                     this._setResponse('Blocked: command not in allowlist or contains unsafe characters.');
                     return;
                 }
-                GLib.spawn_command_line_async(action.command);
+                try {
+                    let [, argv] = GLib.shell_parse_argv(action.command);
+                    if (argv) {
+                        let proc = new Gio.Subprocess({
+                            argv: argv,
+                            flags: Gio.SubprocessFlags.NONE
+                        });
+                        proc.init(null);
+                    }
+                } catch(e) {
+                    log(`Failed to run command: ${e.message}`);
+                }
                 this._setResponse(`Running: ${action.command}`);
                 GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1200, () => {
                     this.hide();

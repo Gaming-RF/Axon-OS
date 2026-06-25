@@ -101,6 +101,21 @@ except ImportError:
             except Exception as exc:
                 yield f"\n[Error: {exc}]"
 
+        def list_conversations(self):
+            return []
+
+        def get_messages(self, conv_id):
+            return []
+
+        def create_conversation(self, title=None):
+            return "fallback"
+
+        def delete_conversation(self, conv_id):
+            pass
+
+        def send_message_stream(self, conv_id, message, system=""):
+            return iter(["AI service unavailable."])
+
 
 # ---------------------------------------------------------------------------
 # MessageBubble

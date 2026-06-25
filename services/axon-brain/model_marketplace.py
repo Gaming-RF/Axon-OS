@@ -277,7 +277,11 @@ class ModelMarketplaceService(dbus.service.Object):
                 {"name": model_name},
                 timeout=10.0,
             )
-            return resp is not None and resp.status == 200
+            try:
+                return resp is not None and resp.status == 200
+            finally:
+                if resp is not None:
+                    resp.close()
         except Exception:
             return False
 
@@ -361,29 +365,33 @@ class ModelMarketplaceService(dbus.service.Object):
     def _do_pull(self, model_name):
         try:
             resp = _http_post(f"{OLLAMA_BASE_URL}/api/pull", {"name": model_name})
-            if resp:
-                for raw_line in resp:
-                    line = raw_line.decode().strip()
-                    if not line:
-                        continue
-                    data = json.loads(line)
-                    status = data.get("status", "")
-                    completed = data.get("completed", 0)
-                    total = data.get("total", 0)
-                    progress = int(completed / total * 100) if total > 0 else -1
-                    self.PullProgress(model_name, status, progress)
+            try:
+                if resp:
+                    for raw_line in resp:
+                        line = raw_line.decode().strip()
+                        if not line:
+                            continue
+                        data = json.loads(line)
+                        status = data.get("status", "")
+                        completed = data.get("completed", 0)
+                        total = data.get("total", 0)
+                        progress = int(completed / total * 100) if total > 0 else -1
+                        self.PullProgress(model_name, status, progress)
+                        with self._lock:
+                            if model_name in self._downloads:
+                                self._downloads[model_name]["status"] = status
+                                self._downloads[model_name]["progress"] = progress
                     with self._lock:
                         if model_name in self._downloads:
-                            self._downloads[model_name]["status"] = status
-                            self._downloads[model_name]["progress"] = progress
-                with self._lock:
-                    if model_name in self._downloads:
-                        self._downloads[model_name]["status"] = "completed"
-                        self._downloads[model_name]["progress"] = 100
-            else:
-                with self._lock:
-                    if model_name in self._downloads:
-                        self._downloads[model_name]["status"] = "error"
+                            self._downloads[model_name]["status"] = "completed"
+                            self._downloads[model_name]["progress"] = 100
+                else:
+                    with self._lock:
+                        if model_name in self._downloads:
+                            self._downloads[model_name]["status"] = "error"
+            finally:
+                if resp is not None:
+                    resp.close()
         except Exception as e:
             with self._lock:
                 if model_name in self._downloads:

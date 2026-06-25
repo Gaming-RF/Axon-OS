@@ -565,22 +565,22 @@ class InstallerApp(Adw.ApplicationWindow):
                         return []
 
                     def partition_disk(self, dev, mode):
-                        return True
+                        raise RuntimeError("Partitioner not available")
 
                     def partition_alongside(self, dev, pnum, sz):
-                        return 3
+                        raise RuntimeError("Partitioner not available")
 
                     def format_partitions(self, dev):
-                        pass
+                        raise RuntimeError("Partitioner not available")
 
                     def format_partitions_alongside(self, dev, rnum):
-                        pass
+                        raise RuntimeError("Partitioner not available")
 
                     def mount_partitions(self, dev, mnt):
-                        pass
+                        raise RuntimeError("Partitioner not available")
 
                     def mount_partitions_alongside(self, dev, enum, rnum, mnt):
-                        pass
+                        raise RuntimeError("Partitioner not available")
 
                 part = MockPartitioner()
             else:
@@ -671,6 +671,7 @@ class InstallerApp(Adw.ApplicationWindow):
                             "--exclude=/lost+found",
                             "--exclude=/cdrom/*",
                             "--exclude=/boot/*",
+                            "--exclude=/home/*",
                             "/",
                             mount + "/",
                         ],
@@ -822,11 +823,11 @@ class InstallerApp(Adw.ApplicationWindow):
                 finally:
                     # Unmount virtual filesystems
                     if mount_efivars:
-                        subprocess.run(["umount", "-l", efi_vars_dest], check=True)
-                    subprocess.run(["umount", "-l", os.path.join(mount, "dev")], check=True)
-                    subprocess.run(["umount", "-l", os.path.join(mount, "proc")], check=True)
-                    subprocess.run(["umount", "-l", os.path.join(mount, "sys")], check=True)
-                    subprocess.run(["umount", "-l", os.path.join(mount, "run")], check=True)
+                        subprocess.run(["umount", "-l", efi_vars_dest], check=False)
+                    subprocess.run(["umount", "-l", os.path.join(mount, "dev")], check=False)
+                    subprocess.run(["umount", "-l", os.path.join(mount, "proc")], check=False)
+                    subprocess.run(["umount", "-l", os.path.join(mount, "sys")], check=False)
+                    subprocess.run(["umount", "-l", os.path.join(mount, "run")], check=False)
 
             self._set_progress(1.00, "Installation complete!")
             GLib.idle_add(self._show_done_dialog)

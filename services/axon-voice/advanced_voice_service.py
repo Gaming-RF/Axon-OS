@@ -143,11 +143,12 @@ class AdvancedVoiceService(dbus.service.Object):
     @dbus.service.method("org.axonos.AdvancedVoice", out_signature="b")
     def StartListening(self):
         """Start recording audio."""
-        if self._listening or self._busy:
-            return False
-        self._busy = True
-        self._listening = True
-        self._partial_transcript = ""
+        with self._lock:
+            if self._listening or self._busy:
+                return False
+            self._busy = True
+            self._listening = True
+            self._partial_transcript = ""
         self.StateChanged("listening")
         GLib.idle_add(self._start_recording)
         return True
@@ -155,10 +156,11 @@ class AdvancedVoiceService(dbus.service.Object):
     @dbus.service.method("org.axonos.AdvancedVoice", out_signature="s")
     def StopAndTranscribe(self):
         """Stop recording and return transcription."""
-        if not self._listening:
-            return json.dumps({"error": "not listening"})
-        self._listening = False
-        self._busy = True
+        with self._lock:
+            if not self._listening:
+                return json.dumps({"error": "not listening"})
+            self._listening = False
+            self._busy = True
         self.StateChanged("transcribing")
         GLib.idle_add(self._stop_and_transcribe)
         return json.dumps({"status": "transcribing"})

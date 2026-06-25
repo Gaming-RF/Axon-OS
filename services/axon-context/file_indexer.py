@@ -44,6 +44,15 @@ class FileIndexer:
 
         logger.info(f"File Indexer initialized. Monitoring: {[str(d) for d in self.watch_dirs]}")
 
+    def close(self):
+        """Close the database connection."""
+        if self.conn:
+            self.conn.close()
+            self.conn = None
+
+    def __del__(self):
+        self.close()
+
     def init_db(self):
         cursor = self.conn.cursor()
         # Normal metadata table

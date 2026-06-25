@@ -44,7 +44,10 @@ class VoiceOverlay(Gtk.ApplicationWindow):
         )
 
         # Animation loop (60 FPS)
-        GLib.timeout_add(16, self.on_tick)
+        self._timer_id = GLib.timeout_add(16, self.on_tick)
+        self.connect(
+            "destroy", lambda _: GLib.source_remove(self._timer_id) if self._timer_id else None
+        )
 
         # Center the window at the bottom of the screen
         self.present()

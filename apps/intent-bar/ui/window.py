@@ -522,11 +522,12 @@ class IntentBarWindow(Adw.Window):
             app_name: str = action.get("app", "")
             safe_name = _validate_app_name(app_name)
             if safe_name:
-                subprocess.Popen(
+                proc = subprocess.Popen(
                     [safe_name],
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                 )
+                threading.Thread(target=proc.wait, daemon=True).start()
 
         elif action_type == "run_command":
             command: str = action.get("command", "")
