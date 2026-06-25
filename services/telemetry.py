@@ -30,9 +30,15 @@ except ImportError:
     except ImportError:
         import logging as _logging
 
-        def configure_app_logger(name, level=_logging.INFO, log_file=None):
+        def configure_app_logger(
+            name: str,
+            level: int = _logging.INFO,
+            log_file: str | None = None,
+            json_output: bool = False,
+        ) -> _logging.Logger:
             _logging.basicConfig(level=level)
             return _logging.getLogger(name)
+
 
 log = configure_app_logger("telemetry")
 
@@ -121,9 +127,7 @@ class Telemetry:
         self._append_jsonl(self._events_file(), entry)
         self._update_daily(event_name)
 
-    def track_crash(
-        self, service: str, error_type: str, traceback_str: str
-    ) -> None:
+    def track_crash(self, service: str, error_type: str, traceback_str: str) -> None:
         """Record a crash report (no PII)."""
         entry = {
             "ts": datetime.now(timezone.utc).isoformat(),
@@ -153,25 +157,26 @@ class Telemetry:
     # ------------------------------------------------------------------
 
     def _load_daily(self) -> None:
-        f = self._daily_file()
-        if f.exists():
-            try:
-                self._daily = json.loads(f.read_text())
-            except Exception:
-                self._daily = {}
+        with self._lock:
+            f = self._daily_file()
+            if f.exists():
+                try:
+                    self._daily = json.loads(f.read_text())
+                except Exception:
+                    self._daily = {}
 
     def _update_daily(self, event_name: str) -> None:
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         with self._lock:
             if self._daily.get("date") != today:
-                self._daily = {"date": today, "events": {}, "services": set()}
+                self._daily = {"date": today, "events": {}, "services": []}
             events = self._daily.setdefault("events", {})
             events[event_name] = events.get(event_name, 0) + 1
             try:
                 save_data = {
                     "date": self._daily["date"],
                     "events": self._daily["events"],
-                    "services": list(self._daily.get("services", set())),
+                    "services": self._daily.get("services", []),
                 }
                 self._daily_file().write_text(json.dumps(save_data, indent=2))
             except Exception:

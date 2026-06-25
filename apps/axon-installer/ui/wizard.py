@@ -44,6 +44,7 @@ def _os_version() -> str:
         pass
     return f'{version} "{codename}"'
 
+
 OLLAMA_MODELS = [
     ("llama3.2:1b", "Llama 3.2 1B", "1.3 GB — fastest, great for the Intent Bar"),
     ("llama3.2:3b", "Llama 3.2 3B", "2.0 GB — recommended balance (default)"),
@@ -181,7 +182,7 @@ def _label(text, *classes, halign=Gtk.Align.START, wrap=False):
 
 
 def _human_size(num_bytes: int) -> str:
-    gib = num_bytes / (1024 ** 3)
+    gib = num_bytes / (1024**3)
     if gib >= 1000:
         return f"{gib / 1024:.1f} TiB"
     return f"{gib:.0f} GiB"
@@ -261,8 +262,11 @@ class InstallerWindow(Adw.Window):
         head.set_margin_bottom(28)
         head.append(_label("⬡", "sidebar-logo", halign=Gtk.Align.CENTER))
         head.append(_label("Axon OS", "sidebar-product", halign=Gtk.Align.CENTER))
-        head.append(_label(f"{_os_version()} — AI-native desktop",
-                           "sidebar-version", halign=Gtk.Align.CENTER))
+        head.append(
+            _label(
+                f"{_os_version()} — AI-native desktop", "sidebar-version", halign=Gtk.Align.CENTER
+            )
+        )
         side.append(head)
 
         self._step_rows = []
@@ -286,8 +290,9 @@ class InstallerWindow(Adw.Window):
         spacer.set_vexpand(True)
         side.append(spacer)
 
-        foot = _label("Local-first AI · Your data stays yours",
-                      "muted", halign=Gtk.Align.CENTER, wrap=True)
+        foot = _label(
+            "Local-first AI · Your data stays yours", "muted", halign=Gtk.Align.CENTER, wrap=True
+        )
         foot.set_margin_bottom(20)
         foot.set_margin_start(16)
         foot.set_margin_end(16)
@@ -298,9 +303,11 @@ class InstallerWindow(Adw.Window):
         for i, (row, dot, lbl) in enumerate(
             zip(self._step_rows, self._step_dots, self._step_labels, strict=False)
         ):
-            for widget, classes in ((row, ["step-row-current"]),
-                                    (dot, ["step-dot-current", "step-dot-done"]),
-                                    (lbl, ["step-label-current", "step-label-done"])):
+            for widget, classes in (
+                (row, ["step-row-current"]),
+                (dot, ["step-dot-current", "step-dot-done"]),
+                (lbl, ["step-label-current", "step-label-done"]),
+            ):
                 for c in classes:
                     widget.get_style_context().remove_class(c)
             if i < self._current:
@@ -318,7 +325,8 @@ class InstallerWindow(Adw.Window):
     def _go(self, name: str) -> None:
         idx = [s[0] for s in _STEPS].index(name)
         self._stack.set_transition_type(
-            Gtk.StackTransitionType.SLIDE_LEFT if idx > self._current
+            Gtk.StackTransitionType.SLIDE_LEFT
+            if idx > self._current
             else Gtk.StackTransitionType.SLIDE_RIGHT
         )
         self._stack.set_visible_child_name(name)
@@ -357,8 +365,7 @@ class InstallerWindow(Adw.Window):
         outer.append(clamp)
         return outer, page
 
-    def _nav_row(self, back_to=None, next_to=None, next_label="Continue",
-                 next_danger=False):
+    def _nav_row(self, back_to=None, next_to=None, next_label="Continue", next_danger=False):
         nav = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         nav.set_halign(Gtk.Align.END)
         nav.set_margin_top(14)
@@ -388,10 +395,15 @@ class InstallerWindow(Adw.Window):
 
         outer.append(_label("⬡", "hero-logo", halign=Gtk.Align.CENTER))
         outer.append(_label("Welcome to Axon OS", "hero-title", halign=Gtk.Align.CENTER))
-        outer.append(_label(
-            "The AI-native operating system. Your assistant lives in the OS itself —\n"
-            "local-first, private, and one keystroke away.",
-            "hero-subtitle", halign=Gtk.Align.CENTER, wrap=True))
+        outer.append(
+            _label(
+                "The AI-native operating system. Your assistant lives in the OS itself —\n"
+                "local-first, private, and one keystroke away.",
+                "hero-subtitle",
+                halign=Gtk.Align.CENTER,
+                wrap=True,
+            )
+        )
 
         chips = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         chips.set_halign(Gtk.Align.CENTER)
@@ -416,8 +428,11 @@ class InstallerWindow(Adw.Window):
         outer.append(btns)
 
         if self._live:
-            note = _label("Trying keeps everything in memory — nothing touches your disk.",
-                          "muted", halign=Gtk.Align.CENTER)
+            note = _label(
+                "Trying keeps everything in memory — nothing touches your disk.",
+                "muted",
+                halign=Gtk.Align.CENTER,
+            )
             note.set_margin_top(12)
             outer.append(note)
         return outer
@@ -430,7 +445,7 @@ class InstallerWindow(Adw.Window):
         outer, page = self._page_box(
             "Connect to the Internet",
             "A connection lets the installer set up Ollama and download your AI model "
-            "automatically. You can also stay offline — AI setup will finish on first boot."
+            "automatically. You can also stay offline — AI setup will finish on first boot.",
         )
 
         self._net_status = _label("Checking connection…", "status-offline")
@@ -466,11 +481,14 @@ class InstallerWindow(Adw.Window):
             try:
                 out = subprocess.run(
                     ["nmcli", "-t", "-f", "CONNECTIVITY", "general"],
-                    capture_output=True, text=True, timeout=5
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
                 ).stdout.strip()
             except Exception:
                 out = "unknown"
             GLib.idle_add(self._set_net_status, out)
+
         threading.Thread(target=check, daemon=True).start()
         return True  # keep the timeout alive
 
@@ -490,9 +508,20 @@ class InstallerWindow(Adw.Window):
             rows = []
             try:
                 out = subprocess.run(
-                    ["nmcli", "-t", "-f", "IN-USE,SSID,SIGNAL,SECURITY",
-                     "dev", "wifi", "list", "--rescan", "yes"],
-                    capture_output=True, text=True, timeout=20
+                    [
+                        "nmcli",
+                        "-t",
+                        "-f",
+                        "IN-USE,SSID,SIGNAL,SECURITY",
+                        "dev",
+                        "wifi",
+                        "list",
+                        "--rescan",
+                        "yes",
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=20,
                 ).stdout
                 seen = set()
                 for line in out.splitlines():
@@ -510,6 +539,7 @@ class InstallerWindow(Adw.Window):
             except Exception:
                 pass
             GLib.idle_add(self._populate_wifi, rows)
+
         threading.Thread(target=scan, daemon=True).start()
 
     def _populate_wifi(self, rows) -> None:
@@ -554,6 +584,7 @@ class InstallerWindow(Adw.Window):
         def on_response(_d, response):
             if response == "connect":
                 self._wifi_connect(ssid, entry.get_text())
+
         dialog.connect("response", on_response)
         dialog.present()
 
@@ -570,6 +601,7 @@ class InstallerWindow(Adw.Window):
                 pass
             GLib.idle_add(self._refresh_wifi)
             self._poll_connectivity()
+
         threading.Thread(target=connect, daemon=True).start()
 
     # ------------------------------------------------------------------
@@ -578,8 +610,7 @@ class InstallerWindow(Adw.Window):
 
     def _page_identity(self):
         outer, page = self._page_box(
-            "Tell Us About You",
-            "This creates your account on the installed system."
+            "Tell Us About You", "This creates your account on the installed system."
         )
 
         group = Adw.PreferencesGroup()
@@ -650,13 +681,18 @@ class InstallerWindow(Adw.Window):
             problem = "Computer name may only contain letters, digits and dashes."
         self._identity_hint.set_label(problem)
 
-        valid = (bool(full_name) and USERNAME_RE.match(username) is not None
-                 and len(pw1) >= 4 and pw1 == pw2
-                 and HOSTNAME_RE.match(hostname) is not None)
+        valid = (
+            bool(full_name)
+            and USERNAME_RE.match(username) is not None
+            and len(pw1) >= 4
+            and pw1 == pw2
+            and HOSTNAME_RE.match(hostname) is not None
+        )
         self._identity_next.set_sensitive(bool(valid))
         if valid:
-            self.state.update(full_name=full_name, username=username,
-                              password=pw1, hostname=hostname)
+            self.state.update(
+                full_name=full_name, username=username, password=pw1, hostname=hostname
+            )
 
     # ------------------------------------------------------------------
     # PAGE — Disk
@@ -665,7 +701,7 @@ class InstallerWindow(Adw.Window):
     def _page_disk(self):
         outer, page = self._page_box(
             "How Do You Want to Install?",
-            "Pick an installation style, then choose the target disk."
+            "Pick an installation style, then choose the target disk.",
         )
 
         mode_group = Adw.PreferencesGroup()
@@ -684,8 +720,8 @@ class InstallerWindow(Adw.Window):
         dual_row = Adw.ActionRow(
             title="Install alongside another OS (dual boot)",
             subtitle="Uses the largest unallocated space (≥ 16 GB) on the selected disk. "
-                     "Shrink a partition in GNOME Disks first if there is none. "
-                     "The GRUB menu will list your other systems at boot.",
+            "Shrink a partition in GNOME Disks first if there is none. "
+            "The GRUB menu will list your other systems at boot.",
         )
         dual_row.add_prefix(self._mode_alongside)
         dual_row.set_activatable_widget(self._mode_alongside)
@@ -701,8 +737,11 @@ class InstallerWindow(Adw.Window):
         disk_group.add(self._disk_list)
         page.append(disk_group)
 
-        warn = _label("⚠ “Erase disk” permanently destroys all data on the chosen disk.",
-                      "warn-text", wrap=True)
+        warn = _label(
+            "⚠ “Erase disk” permanently destroys all data on the chosen disk.",
+            "warn-text",
+            wrap=True,
+        )
         warn.set_margin_top(8)
         page.append(warn)
 
@@ -722,7 +761,9 @@ class InstallerWindow(Adw.Window):
             try:
                 out = subprocess.run(
                     ["lsblk", "-J", "-b", "-d", "-o", "PATH,SIZE,MODEL,TYPE,RO"],
-                    capture_output=True, text=True, timeout=10
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
                 ).stdout
                 for dev in json.loads(out).get("blockdevices", []):
                     if dev.get("type") != "disk" or dev.get("ro"):
@@ -732,11 +773,13 @@ class InstallerWindow(Adw.Window):
                         continue
                     if medium and os.path.realpath(path) == os.path.realpath(medium):
                         continue
-                    disks.append((path, int(dev.get("size") or 0),
-                                  (dev.get("model") or "Disk").strip()))
+                    disks.append(
+                        (path, int(dev.get("size") or 0), (dev.get("model") or "Disk").strip())
+                    )
             except Exception:
                 pass
             GLib.idle_add(self._populate_disks, disks)
+
         threading.Thread(target=scan, daemon=True).start()
 
     @staticmethod
@@ -745,14 +788,22 @@ class InstallerWindow(Adw.Window):
             try:
                 source = subprocess.run(
                     ["findmnt", "-n", "-o", "SOURCE", mount],
-                    capture_output=True, text=True, timeout=5
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
                 ).stdout.strip()
                 if not source:
                     continue
-                pk = subprocess.run(
-                    ["lsblk", "-no", "PKNAME", source],
-                    capture_output=True, text=True, timeout=5
-                ).stdout.strip().splitlines()
+                pk = (
+                    subprocess.run(
+                        ["lsblk", "-no", "PKNAME", source],
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
+                    )
+                    .stdout.strip()
+                    .splitlines()
+                )
                 return f"/dev/{pk[0]}" if pk and pk[0] else source
             except Exception:
                 continue
@@ -797,16 +848,20 @@ class InstallerWindow(Adw.Window):
         outer, page = self._page_box(
             "Set Up Your AI",
             "Axon OS is built around its AI. Choose a local model, connect cloud "
-            "providers, or both — you can change everything later in Settings."
+            "providers, or both — you can change everything later in Settings.",
         )
 
         hero = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         _cls(hero, "ai-hero")
         hero.append(_label("⬡  Local AI with Ollama — recommended", "ai-hero-title"))
-        hero.append(_label(
-            "Runs entirely on this machine. Powers the Intent Bar, AI Panel and "
-            "system-wide assistance with zero data leaving your computer.",
-            "ai-hero-sub", wrap=True))
+        hero.append(
+            _label(
+                "Runs entirely on this machine. Powers the Intent Bar, AI Panel and "
+                "system-wide assistance with zero data leaving your computer.",
+                "ai-hero-sub",
+                wrap=True,
+            )
+        )
         page.append(hero)
 
         local_group = Adw.PreferencesGroup()
@@ -831,8 +886,8 @@ class InstallerWindow(Adw.Window):
         local_group.add(self._model_combo)
 
         self._ollama_switch.connect(
-            "notify::active",
-            lambda sw, _p: self._model_combo.set_sensitive(sw.get_active()))
+            "notify::active", lambda sw, _p: self._model_combo.set_sensitive(sw.get_active())
+        )
         page.append(local_group)
 
         cloud_group = Adw.PreferencesGroup()
@@ -851,8 +906,12 @@ class InstallerWindow(Adw.Window):
             self._provider_rows[pid] = (expander, key_row)
         page.append(cloud_group)
 
-        note = _label("Skipping is fine too — Axon works without AI configured, "
-                      "and the Welcome app can set it up later.", "muted", wrap=True)
+        note = _label(
+            "Skipping is fine too — Axon works without AI configured, "
+            "and the Welcome app can set it up later.",
+            "muted",
+            wrap=True,
+        )
         note.set_margin_top(8)
         page.append(note)
 
@@ -880,7 +939,7 @@ class InstallerWindow(Adw.Window):
     def _page_summary(self):
         outer, page = self._page_box(
             "Ready to Install",
-            "Review your choices. Nothing is written to disk until you press Install."
+            "Review your choices. Nothing is written to disk until you press Install.",
         )
         self._summary_group = Adw.PreferencesGroup()
         self._summary_rows = []
@@ -890,8 +949,9 @@ class InstallerWindow(Adw.Window):
         spacer.set_vexpand(True)
         page.append(spacer)
 
-        nav, _ = self._nav_row(back_to="ai", next_to="install",
-                               next_label="Install Now", next_danger=True)
+        nav, _ = self._nav_row(
+            back_to="ai", next_to="install", next_label="Install Now", next_danger=True
+        )
         page.append(nav)
         return outer
 
@@ -903,8 +963,11 @@ class InstallerWindow(Adw.Window):
         self._summary_rows.clear()
 
         s = self.state
-        mode = ("Erase entire disk" if self._mode_erase.get_active()
-                else "Install alongside another OS (dual boot)")
+        mode = (
+            "Erase entire disk"
+            if self._mode_erase.get_active()
+            else "Install alongside another OS (dual boot)"
+        )
         s["install_mode"] = "erase" if self._mode_erase.get_active() else "alongside"
 
         ai_bits = []
@@ -919,8 +982,7 @@ class InstallerWindow(Adw.Window):
         ]
         for title, value in rows:
             row = Adw.ActionRow(title=title)
-            row.add_suffix(_label(value, "summary-value", wrap=True,
-                                  halign=Gtk.Align.END))
+            row.add_suffix(_label(value, "summary-value", wrap=True, halign=Gtk.Align.END))
             group.add(row)
             self._summary_rows.append(row)
 
@@ -943,12 +1005,14 @@ class InstallerWindow(Adw.Window):
         self._install_bar.set_size_request(460, -1)
         outer.append(self._install_bar)
 
-        self._install_step = _label("Starting installer…", "install-step",
-                                    halign=Gtk.Align.CENTER, wrap=True)
+        self._install_step = _label(
+            "Starting installer…", "install-step", halign=Gtk.Align.CENTER, wrap=True
+        )
         outer.append(self._install_step)
 
-        self._install_tip = _label(INSTALL_TIPS[0], "install-tip",
-                                   halign=Gtk.Align.CENTER, wrap=True)
+        self._install_tip = _label(
+            INSTALL_TIPS[0], "install-tip", halign=Gtk.Align.CENTER, wrap=True
+        )
         self._install_tip.set_margin_top(22)
         self._install_tip.set_size_request(480, -1)
         outer.append(self._install_tip)
@@ -1031,8 +1095,10 @@ class InstallerWindow(Adw.Window):
                         GLib.idle_add(self._on_install_done)
                 self._engine_proc.wait()
                 if self._engine_proc.returncode != 0 and not self._install_failed:
-                    GLib.idle_add(self._on_install_error,
-                                  f"installer exited with code {self._engine_proc.returncode}")
+                    GLib.idle_add(
+                        self._on_install_error,
+                        f"installer exited with code {self._engine_proc.returncode}",
+                    )
             except Exception as exc:
                 GLib.idle_add(self._on_install_error, str(exc))
             finally:
@@ -1041,6 +1107,7 @@ class InstallerWindow(Adw.Window):
                 except OSError:
                     pass
                 self._engine_proc = None
+
         threading.Thread(target=runner, daemon=True).start()
 
     def _on_progress(self, pct: int, msg: str) -> None:
@@ -1072,10 +1139,15 @@ class InstallerWindow(Adw.Window):
 
         outer.append(_label("✓", "check-icon", halign=Gtk.Align.CENTER))
         outer.append(_label("Axon OS Is Installed!", "hero-title", halign=Gtk.Align.CENTER))
-        outer.append(_label(
-            "Remove the installation media, then restart to boot into your new "
-            "AI-native desktop. Your AI finishes setting itself up on first boot.",
-            "hero-subtitle", halign=Gtk.Align.CENTER, wrap=True))
+        outer.append(
+            _label(
+                "Remove the installation media, then restart to boot into your new "
+                "AI-native desktop. Your AI finishes setting itself up on first boot.",
+                "hero-subtitle",
+                halign=Gtk.Align.CENTER,
+                wrap=True,
+            )
+        )
 
         btns = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
         btns.set_halign(Gtk.Align.CENTER)
@@ -1097,3 +1169,11 @@ class InstallerWindow(Adw.Window):
         for cmd in (["systemctl", "reboot"], ["sudo", "-n", "reboot"]):
             if subprocess.run(cmd, capture_output=True).returncode == 0:
                 return
+        # Both commands failed — inform the user
+        dialog = Adw.MessageDialog(
+            transient_for=self,
+            heading="Reboot failed",
+            body="Could not reboot automatically. Please reboot manually.",
+        )
+        dialog.add_response("ok", "OK")
+        dialog.present()

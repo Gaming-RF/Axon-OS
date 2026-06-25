@@ -32,9 +32,7 @@ def _hexagon(center, radius, rotation=math.pi / 6):
 
 def draw_mark(size, transparent=True):
     """Axon hexagon mark with a soft blue glow."""
-    img = Image.new(
-        "RGBA", (size, size), (0, 0, 0, 0) if transparent else (*BG_DARK, 255)
-    )
+    img = Image.new("RGBA", (size, size), (0, 0, 0, 0) if transparent else (*BG_DARK, 255))
 
     glow = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     gd = ImageDraw.Draw(glow)
@@ -82,6 +80,7 @@ def main():
     draw_mark(64).save(os.path.join(HERE, "icon.png"))
     make_welcome().save(os.path.join(HERE, "welcome.png"))
     from axon_logger import configure_app_logger
+
     logger = configure_app_logger(__name__)
     logger.info("Branding images written to %s", HERE)
 

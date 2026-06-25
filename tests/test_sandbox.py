@@ -10,6 +10,7 @@ class TestSandboxFailClosed:
         """Create a SandboxManager with mocked D-Bus."""
         with patch("dbus.service.BusName"), patch("dbus.service.Object.__init__"):
             from services.axon_sandbox.sandbox_manager import SandboxManager
+
             manager = SandboxManager.__new__(SandboxManager)
             manager.session_bus = MagicMock()
             return manager
@@ -27,8 +28,10 @@ class TestSandboxFailClosed:
         manager = self._make_manager()
         callback = MagicMock()
 
-        with patch("pathlib.Path.exists", return_value=True), \
-             patch("pathlib.Path.is_file", return_value=False):
+        with (
+            patch("pathlib.Path.exists", return_value=True),
+            patch("pathlib.Path.is_file", return_value=False),
+        ):
             manager._do_audit_and_prompt("/tmp", callback, MagicMock())
 
         callback.assert_called_once_with("deny")
@@ -37,9 +40,11 @@ class TestSandboxFailClosed:
         manager = self._make_manager()
         callback = MagicMock()
 
-        with patch("pathlib.Path.exists", return_value=True), \
-             patch("pathlib.Path.is_file", return_value=True), \
-             patch("pathlib.Path.read_text", side_effect=PermissionError("denied")):
+        with (
+            patch("pathlib.Path.exists", return_value=True),
+            patch("pathlib.Path.is_file", return_value=True),
+            patch("pathlib.Path.read_text", side_effect=PermissionError("denied")),
+        ):
             manager._do_audit_and_prompt("/tmp/script.sh", callback, MagicMock())
 
         callback.assert_called_once_with("deny")

@@ -17,6 +17,7 @@ class SettingsExecutor:
             self._brain = dbus.Interface(brain_obj, "org.axonos.Brain")
         except Exception as e:
             from axon_logger import configure_app_logger
+
             logger = configure_app_logger(__name__)
             logger.exception("[axon-settings] DBus connection error: %s", e)
             self._brain = None
@@ -26,50 +27,53 @@ class SettingsExecutor:
         if not self._brain:
             self._connect()
             if not self._brain:
-                return {"success": False, "message": "Brain service offline. Cannot process natural language."}
+                return {
+                    "success": False,
+                    "message": "Brain service offline. Cannot process natural language.",
+                }
 
         system_prompt = (
             "You are the Axon OS Settings Router. Analyze the user request and map it to a structured system action.\n"
             "Respond ONLY with a valid JSON object matching one of the following schemas:\n\n"
             "1. Theme modification:\n"
-            "   {\"action\": \"set_theme\", \"value\": \"dark\" | \"light\"}\n\n"
+            '   {"action": "set_theme", "value": "dark" | "light"}\n\n'
             "2. Volume adjustments:\n"
-            "   {\"action\": \"set_volume\", \"value\": 0-100 (integer) | \"mute\" | \"unmute\"}\n\n"
+            '   {"action": "set_volume", "value": 0-100 (integer) | "mute" | "unmute"}\n\n'
             "3. Wi-Fi controls:\n"
-            "   {\"action\": \"set_wifi\", \"value\": true | false}\n\n"
+            '   {"action": "set_wifi", "value": true | false}\n\n'
             "4. Brightness controls:\n"
-            "   {\"action\": \"set_brightness\", \"value\": 0-100 (integer)}\n\n"
+            '   {"action": "set_brightness", "value": 0-100 (integer)}\n\n'
             "5. Display settings:\n"
-            "   {\"action\": \"set_display\", \"setting\": \"night_light\", \"value\": true | false}\n"
-            "   {\"action\": \"set_display\", \"setting\": \"color_temperature\", \"value\": 1000-10000 (integer)}\n"
-            "   {\"action\": \"set_display\", \"setting\": \"scaling\", \"value\": 0.5-3.0 (float)}\n\n"
+            '   {"action": "set_display", "setting": "night_light", "value": true | false}\n'
+            '   {"action": "set_display", "setting": "color_temperature", "value": 1000-10000 (integer)}\n'
+            '   {"action": "set_display", "setting": "scaling", "value": 0.5-3.0 (float)}\n\n'
             "6. Bluetooth controls:\n"
-            "   {\"action\": \"set_bluetooth\", \"setting\": \"power\", \"value\": true | false}\n"
-            "   {\"action\": \"set_bluetooth\", \"setting\": \"discoverable\", \"value\": true | false}\n\n"
+            '   {"action": "set_bluetooth", "setting": "power", "value": true | false}\n'
+            '   {"action": "set_bluetooth", "setting": "discoverable", "value": true | false}\n\n'
             "7. Power settings:\n"
-            "   {\"action\": \"set_power\", \"setting\": \"sleep_timeout\", \"value\": 0-3600 (seconds, 0=never)}\n"
-            "   {\"action\": \"set_power\", \"setting\": \"power_button\", \"value\": \"suspend\" | \"hibernate\" | \"nothing\" | \"interactive\"}\n\n"
+            '   {"action": "set_power", "setting": "sleep_timeout", "value": 0-3600 (seconds, 0=never)}\n'
+            '   {"action": "set_power", "setting": "power_button", "value": "suspend" | "hibernate" | "nothing" | "interactive"}\n\n'
             "8. Input settings:\n"
-            "   {\"action\": \"set_input\", \"setting\": \"natural_scroll\", \"value\": true | false}\n"
-            "   {\"action\": \"set_input\", \"setting\": \"tap_to_click\", \"value\": true | false}\n"
-            "   {\"action\": \"set_input\", \"setting\": \"mouse_speed\", \"value\": -1.0 to 1.0 (float)}\n\n"
+            '   {"action": "set_input", "setting": "natural_scroll", "value": true | false}\n'
+            '   {"action": "set_input", "setting": "tap_to_click", "value": true | false}\n'
+            '   {"action": "set_input", "setting": "mouse_speed", "value": -1.0 to 1.0 (float)}\n\n'
             "9. Lock screen settings:\n"
-            "   {\"action\": \"set_lockscreen\", \"setting\": \"auto_lock\", \"value\": true | false}\n"
-            "   {\"action\": \"set_lockscreen\", \"setting\": \"lock_delay\", \"value\": 0-3600 (seconds)}\n\n"
+            '   {"action": "set_lockscreen", "setting": "auto_lock", "value": true | false}\n'
+            '   {"action": "set_lockscreen", "setting": "lock_delay", "value": 0-3600 (seconds)}\n\n'
             "10. Notification settings:\n"
-            "   {\"action\": \"set_notifications\", \"setting\": \"dnd\", \"value\": true | false}\n\n"
+            '   {"action": "set_notifications", "setting": "dnd", "value": true | false}\n\n'
             "11. Unrecognized queries:\n"
-            "   {\"action\": \"unknown\", \"message\": \"Brief explanation of what commands are supported\"}\n\n"
+            '   {"action": "unknown", "message": "Brief explanation of what commands are supported"}\n\n'
             "Examples:\n"
-            "- \"make it dark\" -> {\"action\": \"set_theme\", \"value\": \"dark\"}\n"
-            "- \"turn off wifi\" -> {\"action\": \"set_wifi\", \"value\": false}\n"
-            "- \"mute sound\" -> {\"action\": \"set_volume\", \"value\": \"mute\"}\n"
-            "- \"enable night light\" -> {\"action\": \"set_display\", \"setting\": \"night_light\", \"value\": true}\n"
-            "- \"turn on bluetooth\" -> {\"action\": \"set_bluetooth\", \"setting\": \"power\", \"value\": true}\n"
-            "- \"set sleep timeout to 5 minutes\" -> {\"action\": \"set_power\", \"setting\": \"sleep_timeout\", \"value\": 300}\n"
-            "- \"enable natural scrolling\" -> {\"action\": \"set_input\", \"setting\": \"natural_scroll\", \"value\": true}\n"
-            "- \"enable do not disturb\" -> {\"action\": \"set_notifications\", \"setting\": \"dnd\", \"value\": true}\n"
-            "- \"disable auto lock\" -> {\"action\": \"set_lockscreen\", \"setting\": \"auto_lock\", \"value\": false}"
+            '- "make it dark" -> {"action": "set_theme", "value": "dark"}\n'
+            '- "turn off wifi" -> {"action": "set_wifi", "value": false}\n'
+            '- "mute sound" -> {"action": "set_volume", "value": "mute"}\n'
+            '- "enable night light" -> {"action": "set_display", "setting": "night_light", "value": true}\n'
+            '- "turn on bluetooth" -> {"action": "set_bluetooth", "setting": "power", "value": true}\n'
+            '- "set sleep timeout to 5 minutes" -> {"action": "set_power", "setting": "sleep_timeout", "value": 300}\n'
+            '- "enable natural scrolling" -> {"action": "set_input", "setting": "natural_scroll", "value": true}\n'
+            '- "enable do not disturb" -> {"action": "set_notifications", "setting": "dnd", "value": true}\n'
+            '- "disable auto lock" -> {"action": "set_lockscreen", "setting": "auto_lock", "value": false}'
         )
 
         try:
@@ -105,7 +109,10 @@ class SettingsExecutor:
             elif action == "set_notifications":
                 return self._set_notifications(data.get("setting"), value)
             else:
-                msg = data.get("message", "I can help you adjust theme, volume, Wi-Fi, brightness, display, bluetooth, power, input, lock screen, and notifications. Try saying 'turn off wifi' or 'enable night light'.")
+                msg = data.get(
+                    "message",
+                    "I can help you adjust theme, volume, Wi-Fi, brightness, display, bluetooth, power, input, lock screen, and notifications. Try saying 'turn off wifi' or 'enable night light'.",
+                )
                 return {"success": False, "message": msg}
 
         except Exception as e:
@@ -116,12 +123,21 @@ class SettingsExecutor:
             return {"success": False, "message": "Invalid theme setting. Use 'dark' or 'light'."}
 
         scheme = "prefer-dark" if value == "dark" else "prefer-light"
-        gtk_theme = "axon-gtk" if value == "dark" else "Adwaita" # Fallback to default light theme
+        gtk_theme = "axon-gtk" if value == "dark" else "Adwaita"  # Fallback to default light theme
 
         try:
-            subprocess.run(["gsettings", "set", "org.gnome.desktop.interface", "color-scheme", scheme], check=True)
-            subprocess.run(["gsettings", "set", "org.gnome.desktop.interface", "gtk-theme", gtk_theme], check=True)
-            return {"success": True, "message": f"System theme switched to {value} mode successfully."}
+            subprocess.run(
+                ["gsettings", "set", "org.gnome.desktop.interface", "color-scheme", scheme],
+                check=True,
+            )
+            subprocess.run(
+                ["gsettings", "set", "org.gnome.desktop.interface", "gtk-theme", gtk_theme],
+                check=True,
+            )
+            return {
+                "success": True,
+                "message": f"System theme switched to {value} mode successfully.",
+            }
         except subprocess.SubprocessError as e:
             return {"success": False, "message": f"Failed to modify theme setting: {e}"}
 
@@ -137,7 +153,9 @@ class SettingsExecutor:
                 vol = int(value)
                 if not (0 <= vol <= 100):
                     raise ValueError("Volume must be between 0 and 100")
-                subprocess.run(["pactl", "set-sink-volume", "@DEFAULT_SINK@", f"{vol}%"], check=True)
+                subprocess.run(
+                    ["pactl", "set-sink-volume", "@DEFAULT_SINK@", f"{vol}%"], check=True
+                )
                 return {"success": True, "message": f"Volume adjusted to {vol}%."}
         except Exception:
             # Fallback to amixer if pactl fails
@@ -178,7 +196,9 @@ class SettingsExecutor:
 
             # Try GNOME power settings D-Bus interface
             bus = dbus.SessionBus()
-            power_obj = bus.get_object("org.gnome.SettingsDaemon.Power", "/org/gnome/SettingsDaemon/Power")
+            power_obj = bus.get_object(
+                "org.gnome.SettingsDaemon.Power", "/org/gnome/SettingsDaemon/Power"
+            )
             screen_iface = dbus.Interface(power_obj, "org.gnome.SettingsDaemon.Power.Screen")
             screen_iface.SetPercentage(vol)
             return {"success": True, "message": f"Display brightness adjusted to {vol}%."}
@@ -190,8 +210,13 @@ class SettingsExecutor:
             if setting == "night_light":
                 state = "true" if value else "false"
                 subprocess.run(
-                    ["gsettings", "set", "org.gnome.settings-daemon.plugins.color",
-                     "night-light-enabled", state],
+                    [
+                        "gsettings",
+                        "set",
+                        "org.gnome.settings-daemon.plugins.color",
+                        "night-light-enabled",
+                        state,
+                    ],
                     check=True,
                 )
                 label = "enabled" if value else "disabled"
@@ -200,10 +225,18 @@ class SettingsExecutor:
             elif setting == "color_temperature":
                 temp = int(value)
                 if not (1000 <= temp <= 10000):
-                    return {"success": False, "message": "Color temperature must be between 1000 and 10000."}
+                    return {
+                        "success": False,
+                        "message": "Color temperature must be between 1000 and 10000.",
+                    }
                 subprocess.run(
-                    ["gsettings", "set", "org.gnome.settings-daemon.plugins.color",
-                     "night-light-temperature", str(temp)],
+                    [
+                        "gsettings",
+                        "set",
+                        "org.gnome.settings-daemon.plugins.color",
+                        "night-light-temperature",
+                        str(temp),
+                    ],
                     check=True,
                 )
                 return {"success": True, "message": f"Color temperature set to {temp}K."}
@@ -211,16 +244,27 @@ class SettingsExecutor:
             elif setting == "scaling":
                 factor = float(value)
                 if not (0.5 <= factor <= 3.0):
-                    return {"success": False, "message": "Scaling factor must be between 0.5 and 3.0."}
+                    return {
+                        "success": False,
+                        "message": "Scaling factor must be between 0.5 and 3.0.",
+                    }
                 subprocess.run(
-                    ["gsettings", "set", "org.gnome.desktop.interface",
-                     "text-scaling-factor", str(factor)],
+                    [
+                        "gsettings",
+                        "set",
+                        "org.gnome.desktop.interface",
+                        "text-scaling-factor",
+                        str(factor),
+                    ],
                     check=True,
                 )
                 return {"success": True, "message": f"Text scaling factor set to {factor}."}
 
             else:
-                return {"success": False, "message": "Unknown display setting. Supported: night_light, color_temperature, scaling."}
+                return {
+                    "success": False,
+                    "message": "Unknown display setting. Supported: night_light, color_temperature, scaling.",
+                }
         except subprocess.SubprocessError as e:
             return {"success": False, "message": f"Failed to modify display setting: {e}"}
 
@@ -238,7 +282,10 @@ class SettingsExecutor:
                 return {"success": True, "message": f"Bluetooth discoverability {label}."}
 
             else:
-                return {"success": False, "message": "Unknown bluetooth setting. Supported: power, discoverable."}
+                return {
+                    "success": False,
+                    "message": "Unknown bluetooth setting. Supported: power, discoverable.",
+                }
         except subprocess.SubprocessError as e:
             # Fallback: try rfkill for power toggling
             if setting == "power":
@@ -256,10 +303,12 @@ class SettingsExecutor:
             if setting == "sleep_timeout":
                 seconds = int(value)
                 if not (0 <= seconds <= 3600):
-                    return {"success": False, "message": "Sleep timeout must be between 0 and 3600 seconds."}
+                    return {
+                        "success": False,
+                        "message": "Sleep timeout must be between 0 and 3600 seconds.",
+                    }
                 subprocess.run(
-                    ["gsettings", "set", "org.gnome.desktop.session",
-                     "idle-delay", str(seconds)],
+                    ["gsettings", "set", "org.gnome.desktop.session", "idle-delay", str(seconds)],
                     check=True,
                 )
                 label = "disabled" if seconds == 0 else f"set to {seconds} seconds"
@@ -268,16 +317,27 @@ class SettingsExecutor:
             elif setting == "power_button":
                 valid_actions = ("suspend", "hibernate", "nothing", "interactive")
                 if value not in valid_actions:
-                    return {"success": False, "message": f"Invalid power button action. Choose from: {', '.join(valid_actions)}."}
+                    return {
+                        "success": False,
+                        "message": f"Invalid power button action. Choose from: {', '.join(valid_actions)}.",
+                    }
                 subprocess.run(
-                    ["gsettings", "set", "org.gnome.settings-daemon.plugins.power",
-                     "power-button-action", value],
+                    [
+                        "gsettings",
+                        "set",
+                        "org.gnome.settings-daemon.plugins.power",
+                        "power-button-action",
+                        value,
+                    ],
                     check=True,
                 )
                 return {"success": True, "message": f"Power button action set to '{value}'."}
 
             else:
-                return {"success": False, "message": "Unknown power setting. Supported: sleep_timeout, power_button."}
+                return {
+                    "success": False,
+                    "message": "Unknown power setting. Supported: sleep_timeout, power_button.",
+                }
         except subprocess.SubprocessError as e:
             return {"success": False, "message": f"Failed to modify power setting: {e}"}
 
@@ -286,8 +346,13 @@ class SettingsExecutor:
             if setting == "natural_scroll":
                 state = "true" if value else "false"
                 subprocess.run(
-                    ["gsettings", "set", "org.gnome.desktop.peripherals.touchpad",
-                     "natural-scroll", state],
+                    [
+                        "gsettings",
+                        "set",
+                        "org.gnome.desktop.peripherals.touchpad",
+                        "natural-scroll",
+                        state,
+                    ],
                     check=True,
                 )
                 label = "enabled" if value else "disabled"
@@ -296,8 +361,13 @@ class SettingsExecutor:
             elif setting == "tap_to_click":
                 state = "true" if value else "false"
                 subprocess.run(
-                    ["gsettings", "set", "org.gnome.desktop.peripherals.touchpad",
-                     "tap-to-click", state],
+                    [
+                        "gsettings",
+                        "set",
+                        "org.gnome.desktop.peripherals.touchpad",
+                        "tap-to-click",
+                        state,
+                    ],
                     check=True,
                 )
                 label = "enabled" if value else "disabled"
@@ -306,16 +376,27 @@ class SettingsExecutor:
             elif setting == "mouse_speed":
                 speed = float(value)
                 if not (-1.0 <= speed <= 1.0):
-                    return {"success": False, "message": "Mouse speed must be between -1.0 and 1.0."}
+                    return {
+                        "success": False,
+                        "message": "Mouse speed must be between -1.0 and 1.0.",
+                    }
                 subprocess.run(
-                    ["gsettings", "set", "org.gnome.desktop.peripherals.mouse",
-                     "speed", str(speed)],
+                    [
+                        "gsettings",
+                        "set",
+                        "org.gnome.desktop.peripherals.mouse",
+                        "speed",
+                        str(speed),
+                    ],
                     check=True,
                 )
                 return {"success": True, "message": f"Mouse speed set to {speed}."}
 
             else:
-                return {"success": False, "message": "Unknown input setting. Supported: natural_scroll, tap_to_click, mouse_speed."}
+                return {
+                    "success": False,
+                    "message": "Unknown input setting. Supported: natural_scroll, tap_to_click, mouse_speed.",
+                }
         except subprocess.SubprocessError as e:
             return {"success": False, "message": f"Failed to modify input setting: {e}"}
 
@@ -324,8 +405,7 @@ class SettingsExecutor:
             if setting == "auto_lock":
                 state = "true" if value else "false"
                 subprocess.run(
-                    ["gsettings", "set", "org.gnome.desktop.screensaver",
-                     "lock-enabled", state],
+                    ["gsettings", "set", "org.gnome.desktop.screensaver", "lock-enabled", state],
                     check=True,
                 )
                 label = "enabled" if value else "disabled"
@@ -334,16 +414,27 @@ class SettingsExecutor:
             elif setting == "lock_delay":
                 seconds = int(value)
                 if not (0 <= seconds <= 3600):
-                    return {"success": False, "message": "Lock delay must be between 0 and 3600 seconds."}
+                    return {
+                        "success": False,
+                        "message": "Lock delay must be between 0 and 3600 seconds.",
+                    }
                 subprocess.run(
-                    ["gsettings", "set", "org.gnome.desktop.screensaver",
-                     "lock-delay", str(seconds)],
+                    [
+                        "gsettings",
+                        "set",
+                        "org.gnome.desktop.screensaver",
+                        "lock-delay",
+                        str(seconds),
+                    ],
                     check=True,
                 )
                 return {"success": True, "message": f"Lock delay set to {seconds} seconds."}
 
             else:
-                return {"success": False, "message": "Unknown lock screen setting. Supported: auto_lock, lock_delay."}
+                return {
+                    "success": False,
+                    "message": "Unknown lock screen setting. Supported: auto_lock, lock_delay.",
+                }
         except subprocess.SubprocessError as e:
             return {"success": False, "message": f"Failed to modify lock screen setting: {e}"}
 
@@ -353,14 +444,16 @@ class SettingsExecutor:
                 # DND = hide banners, so invert: dnd=true means show-banners=false
                 state = "false" if value else "true"
                 subprocess.run(
-                    ["gsettings", "set", "org.gnome.desktop.notifications",
-                     "show-banners", state],
+                    ["gsettings", "set", "org.gnome.desktop.notifications", "show-banners", state],
                     check=True,
                 )
                 label = "enabled" if value else "disabled"
                 return {"success": True, "message": f"Do Not Disturb {label}."}
 
             else:
-                return {"success": False, "message": "Unknown notification setting. Supported: dnd."}
+                return {
+                    "success": False,
+                    "message": "Unknown notification setting. Supported: dnd.",
+                }
         except subprocess.SubprocessError as e:
             return {"success": False, "message": f"Failed to modify notification setting: {e}"}

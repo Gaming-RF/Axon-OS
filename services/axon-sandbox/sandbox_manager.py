@@ -18,11 +18,14 @@ from gi.repository import Gdk, GLib, Gtk
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 try:
     from axon_logger import configure_app_logger
+
     logger = configure_app_logger(__name__)
 except ImportError:
     import logging
+
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger("axon-sandbox")
+
 
 class SandboxPromptDialog(Gtk.Window):
     def __init__(self, script_name, warnings, callback):
@@ -36,7 +39,8 @@ class SandboxPromptDialog(Gtk.Window):
         # UI Styling
         self.add_css_class("sandbox-dialog")
         css_provider = Gtk.CssProvider()
-        css_provider.load_from_data("""
+        css_provider.load_from_data(
+            """
             .sandbox-dialog {
                 background-color: #0b0b12;
             }
@@ -77,11 +81,11 @@ class SandboxPromptDialog(Gtk.Window):
                 padding: 8px 16px;
                 border-radius: 8px;
             }
-        """, -1)
+        """,
+            -1,
+        )
         Gtk.StyleContext.add_provider_for_display(
-            Gdk.Display.get_default(),
-            css_provider,
-            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+            Gdk.Display.get_default(), css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
         )
 
         # Main Layout
@@ -165,35 +169,43 @@ class SandboxPromptDialog(Gtk.Window):
         self.callback("block")
         return False
 
+
 class SandboxManager(dbus.service.Object):
     def __init__(self):
         dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
         self.session_bus = dbus.SessionBus()
 
         try:
-            self.bus_name = dbus.service.BusName('org.axonos.Sandbox', bus=self.session_bus)
+            self.bus_name = dbus.service.BusName("org.axonos.Sandbox", bus=self.session_bus)
         except dbus.exceptions.NameExistsException:
             logger.error("org.axonos.Sandbox service is already running.")
             sys.exit(1)
 
-        dbus.service.Object.__init__(self, self.session_bus, '/org/axonos/Sandbox')
-        logger.info("Axon Sandbox Manager D-Bus Service registered successfully at /org/axonos/Sandbox")
+        dbus.service.Object.__init__(self, self.session_bus, "/org/axonos/Sandbox")
+        logger.info(
+            "Axon Sandbox Manager D-Bus Service registered successfully at /org/axonos/Sandbox"
+        )
 
-    @dbus.service.method('org.axonos.Sandbox', in_signature='s', out_signature='s', async_callbacks=('dbus_ok', 'dbus_err'))
+    @dbus.service.method(
+        "org.axonos.Sandbox",
+        in_signature="s",
+        out_signature="s",
+        async_callbacks=("dbus_ok", "dbus_err"),
+    )
     def AuditAndPrompt(self, script_path, dbus_ok, dbus_err):
         """Asynchronously audits a script and prompts the user for sandbox choice."""
         logger.info(f"Received Sandbox audit request for: {script_path}")
         threading.Thread(
-            target=self._do_audit_and_prompt,
-            args=(script_path, dbus_ok, dbus_err),
-            daemon=True
+            target=self._do_audit_and_prompt, args=(script_path, dbus_ok, dbus_err), daemon=True
         ).start()
 
     def _do_audit_and_prompt(self, script_path, dbus_ok, dbus_err):
         try:
             p = Path(script_path)
             if not p.exists() or not p.is_file():
-                logger.warning("Sandbox audit: file not found or not a regular file: %s", script_path)
+                logger.warning(
+                    "Sandbox audit: file not found or not a regular file: %s", script_path
+                )
                 dbus_ok("deny")
                 return
 
@@ -208,8 +220,8 @@ class SandboxManager(dbus.service.Object):
             # Call Brain service to check warnings
             warnings = []
             try:
-                brain_obj = self.session_bus.get_object('org.axonos.Brain', '/org/axonos/Brain')
-                brain_interface = dbus.Interface(brain_obj, 'org.axonos.Brain')
+                brain_obj = self.session_bus.get_object("org.axonos.Brain", "/org/axonos/Brain")
+                brain_interface = dbus.Interface(brain_obj, "org.axonos.Brain")
 
                 prompt = (
                     f"Read this script path: {script_path}\n"
@@ -241,13 +253,15 @@ class SandboxManager(dbus.service.Object):
             # Open warning prompt if warnings exist, otherwise run normally
             if warnings:
                 logger.info(f"Script {script_path} flagged. Displaying warning prompt...")
+
                 def launch_dialog():
                     dialog = SandboxPromptDialog(
                         script_name=p.name,
                         warnings=warnings,
-                        callback=lambda decision: dbus_ok(decision)
+                        callback=lambda decision: dbus_ok(decision),
                     )
                     dialog.present()
+
                 GLib.idle_add(launch_dialog)
             else:
                 logger.info(f"Script {script_path} is marked clean. Allow execution.")
@@ -255,9 +269,13 @@ class SandboxManager(dbus.service.Object):
 
         except Exception:
             logger.exception("Error in sandbox manager:")
-            dbus_ok("deny")
+            try:
+                dbus_ok("deny")
+            except Exception:
+                pass
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     # Initialize GTK before creating any GTK widgets
     Gtk.init()
     loop = GLib.MainLoop()

@@ -14,13 +14,22 @@ With ``--remove``, removes installed artifacts for the plugin.
 """
 
 import argparse
+import re
 import sys
 from pathlib import Path
 
 try:
     import tomllib
 except ModuleNotFoundError:
-    import tomli as tomllib  # type: ignore[no-redef]
+    import tomli as tomllib
+
+
+_SAFE_BUS_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9._-]*$")
+
+
+def _validate_bus_name(bus_name: str) -> bool:
+    """Return True if bus_name is safe for use in filesystem paths."""
+    return bool(_SAFE_BUS_RE.match(bus_name)) and ".." not in bus_name
 
 
 def generate_systemd_unit(manifest: dict, install_dir: Path) -> str:
@@ -64,11 +73,7 @@ def generate_dbus_service(manifest: dict, install_dir: Path) -> str:
     """Generate a D-Bus session service activation file."""
     svc = manifest["service"]
     entry = install_dir / svc["entry_point"]
-    return (
-        "[D-BUS Service]\n"
-        f"Name={svc['bus_name']}\n"
-        f"Exec=/usr/bin/python3 {entry}\n"
-    )
+    return f"[D-BUS Service]\nName={svc['bus_name']}\nExec=/usr/bin/python3 {entry}\n"
 
 
 def generate_dbus_policy(manifest: dict, user: str = "${user}") -> str:
@@ -94,6 +99,13 @@ def install_plugin(manifest_path: Path) -> None:
     manifest = tomllib.loads(manifest_path.read_text(encoding="utf-8"))
     name = manifest["service"]["name"]
     bus_name = manifest["service"]["bus_name"]
+
+    if not _validate_bus_name(bus_name):
+        print(f"Error: invalid bus_name '{bus_name}' — must be alphanumeric with dots/hyphens")  # noqa: T201
+        return
+    if not _validate_bus_name(name):
+        print(f"Error: invalid plugin name '{name}' — must be alphanumeric with dots/hyphens")  # noqa: T201
+        return
     plugin_dir = manifest_path.parent
 
     # Paths
@@ -144,6 +156,10 @@ def remove_plugin(manifest_path: Path) -> None:
     manifest = tomllib.loads(manifest_path.read_text(encoding="utf-8"))
     name = manifest["service"]["name"]
     bus_name = manifest["service"]["bus_name"]
+
+    if not _validate_bus_name(bus_name) or not _validate_bus_name(name):
+        print("Error: invalid bus_name or plugin name")  # noqa: T201
+        return
 
     systemd_dir = Path.home() / ".config" / "systemd" / "user"
     dbus_services_dir = Path.home() / ".local" / "share" / "dbus-1" / "services"

@@ -31,7 +31,7 @@ from pathlib import Path
 try:
     import tomllib
 except ModuleNotFoundError:
-    import tomli as tomllib  # type: ignore[no-redef]
+    import tomli as tomllib
 
 import dbus
 from gi.repository import GLib
@@ -45,7 +45,12 @@ except ImportError:
     except ImportError:
         import logging as _logging
 
-        def configure_app_logger(name, level=_logging.INFO, log_file=None):
+        def configure_app_logger(
+            name: str,
+            level: int = _logging.INFO,
+            log_file: str | None = None,
+            json_output: bool = False,
+        ) -> _logging.Logger:
             _logging.basicConfig(level=level)
             return _logging.getLogger(name)
 
@@ -194,9 +199,7 @@ class ServiceRegistry:
         """
         # Reject core bus names
         if manifest.bus_name in _CORE_BUS_NAMES:
-            raise ValueError(
-                f"Plugin '{manifest.name}' declares core bus name {manifest.bus_name}"
-            )
+            raise ValueError(f"Plugin '{manifest.name}' declares core bus name {manifest.bus_name}")
 
         # Reject duplicate names
         if manifest.name in self._plugins:
@@ -242,9 +245,7 @@ class ServiceRegistry:
         entry_path = info.manifest.manifest_path.parent / info.manifest.entry_point
         try:
             start = time.monotonic()
-            spec = importlib.util.spec_from_file_location(
-                f"axon_plugin_{name}", str(entry_path)
-            )
+            spec = importlib.util.spec_from_file_location(f"axon_plugin_{name}", str(entry_path))
             if spec is None or spec.loader is None:
                 raise ImportError(f"Cannot create spec for {entry_path}")
             module = importlib.util.module_from_spec(spec)
@@ -253,9 +254,7 @@ class ServiceRegistry:
             info.module = module
             info.load_time = time.monotonic() - start
             info.status = "loaded"
-            logger.info(
-                "Plugin '%s' loaded in %.1fms", name, info.load_time * 1000
-            )
+            logger.info("Plugin '%s' loaded in %.1fms", name, info.load_time * 1000)
             return True
         except Exception as exc:
             info.status = "error"
@@ -319,9 +318,7 @@ class ServiceRegistry:
                 except Exception:
                     loop.quit()
 
-            thread = threading.Thread(
-                target=_run, daemon=True, name=f"plugin-{name}"
-            )
+            thread = threading.Thread(target=_run, daemon=True, name=f"plugin-{name}")
             thread.start()
 
             info.status = "running"
@@ -399,7 +396,7 @@ class ServiceRegistry:
         """Check if a D-Bus name has an owner on the session bus."""
         try:
             bus = dbus.SessionBus()
-            return bus.name_has_owner(bus_name)
+            return bool(bus.name_has_owner(bus_name))
         except Exception:
             return False
 
@@ -407,21 +404,18 @@ class ServiceRegistry:
         """Topological sort of plugins by dependency order."""
         with self._lock:
             names = list(self._plugins.keys())
+            plugins_snapshot = dict(self._plugins)
 
         # Map bus names to plugin names for dependency resolution
         bus_to_name: dict[str, str] = {}
         for name in names:
-            bus_to_name[self._plugins[name].manifest.bus_name] = name
+            bus_to_name[plugins_snapshot[name].manifest.bus_name] = name
 
         # Build adjacency using plugin names
         deps: dict[str, list[str]] = {}
         for name in names:
-            info = self._plugins[name]
-            deps[name] = [
-                bus_to_name[d]
-                for d in info.manifest.dependencies
-                if d in bus_to_name
-            ]
+            info = plugins_snapshot[name]
+            deps[name] = [bus_to_name[d] for d in info.manifest.dependencies if d in bus_to_name]
 
         # Kahn's algorithm
         in_degree: dict[str, int] = dict.fromkeys(names, 0)
@@ -449,16 +443,12 @@ class ServiceRegistry:
         return result
 
     @staticmethod
-    def _find_service_factory(module) -> Callable | None:
+    def _find_service_factory(module: object) -> Callable | None:
         """Find a ServiceBase subclass in the module and return a factory."""
         from service_base import ServiceBase
 
         for attr_name in dir(module):
             attr = getattr(module, attr_name)
-            if (
-                isinstance(attr, type)
-                and issubclass(attr, ServiceBase)
-                and attr is not ServiceBase
-            ):
+            if isinstance(attr, type) and issubclass(attr, ServiceBase) and attr is not ServiceBase:
                 return attr
         return None

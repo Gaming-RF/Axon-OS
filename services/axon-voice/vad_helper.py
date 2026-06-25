@@ -5,6 +5,7 @@ an energy-based heuristic so ambient mode degrades gracefully on systems
 without webrtcvad installed. Pure stdlib + optional webrtcvad so it is
 unit-testable.
 """
+
 from __future__ import annotations
 
 import math
@@ -13,6 +14,7 @@ from pathlib import Path
 
 try:
     import webrtcvad  # type: ignore
+
     HAVE_WEBRTC = True
 except Exception:
     HAVE_WEBRTC = False
@@ -77,4 +79,3 @@ def is_speech_wav(path: str | Path, sample_rate: int = 16000) -> bool:
     # RMS energy heuristic
     rms = _rms_from_pcm(pcm[: sample_rate * 2])  # first second
     return rms > 500.0
-

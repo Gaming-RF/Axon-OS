@@ -125,8 +125,10 @@ _CSS = b"""
 }
 """
 
+
 def _add_class(widget: Gtk.Widget, css_class: str) -> None:
     widget.get_style_context().add_class(css_class)
+
 
 def _remove_class(widget: Gtk.Widget, css_class: str) -> None:
     widget.get_style_context().remove_class(css_class)
@@ -203,16 +205,28 @@ class WelcomeWindow(Adw.Window):
 
         # Register D-Bus signal listener for model pulls
         self.bus.add_signal_receiver(
-            self._on_pull_progress,
-            signal_name="PullProgress",
-            dbus_interface="org.axonos.Brain"
+            self._on_pull_progress, signal_name="PullProgress", dbus_interface="org.axonos.Brain"
         )
+
+        # Clean up signal receiver when window is destroyed
+        self.connect("destroy", self._on_destroy)
 
     def _connect_brain(self) -> None:
         try:
-            self.brain = self.bus.get_object('org.axonos.Brain', '/org/axonos/Brain')
+            self.brain = self.bus.get_object("org.axonos.Brain", "/org/axonos/Brain")
         except Exception:
             self.brain = None
+
+    def _on_destroy(self, _widget) -> None:
+        """Remove D-Bus signal receivers to break reference cycles."""
+        try:
+            self.bus.remove_signal_receiver(
+                self._on_pull_progress,
+                signal_name="PullProgress",
+                dbus_interface="org.axonos.Brain",
+            )
+        except Exception:
+            pass
 
     def _run_profiling(self) -> None:
         if hardware_profiler:
@@ -223,9 +237,21 @@ class WelcomeWindow(Adw.Window):
                 self._hw_info_str = f"Hardware profile: {hw.get('ram_gb')}GB RAM | GPU: {hw.get('gpu_vendor')} ({hw.get('gpu_model')})"
 
                 self._models = [
-                    ("Speed Model", recs.get("speed", {}).get("model"), recs.get("speed", {}).get("description")),
-                    ("General Model", recs.get("general", {}).get("model"), recs.get("general", {}).get("description")),
-                    ("Deep Task Model", recs.get("deep", {}).get("model"), recs.get("deep", {}).get("description"))
+                    (
+                        "Speed Model",
+                        recs.get("speed", {}).get("model"),
+                        recs.get("speed", {}).get("description"),
+                    ),
+                    (
+                        "General Model",
+                        recs.get("general", {}).get("model"),
+                        recs.get("general", {}).get("description"),
+                    ),
+                    (
+                        "Deep Task Model",
+                        recs.get("deep", {}).get("model"),
+                        recs.get("deep", {}).get("description"),
+                    ),
                 ]
                 return
             except Exception:
@@ -236,7 +262,7 @@ class WelcomeWindow(Adw.Window):
         self._models = [
             ("Speed Model", "llama3.2:1b", "Llama 3.2 1B — fast command processing."),
             ("General Model", "llama3.2:3b", "Llama 3.2 3B — balanced conversation."),
-            ("Deep Task Model", "llama3:8b", "Llama 3 8B — high reasoning, running on CPU RAM.")
+            ("Deep Task Model", "llama3:8b", "Llama 3 8B — high reasoning, running on CPU RAM."),
         ]
 
     # ------------------------------------------------------------------
@@ -366,7 +392,7 @@ class WelcomeWindow(Adw.Window):
 
         # Model checkboxes group
         self._model_checks = []
-        self._selected_model = self._models[1][1] # Default to General Model
+        self._selected_model = self._models[1][1]  # Default to General Model
         first_check = None
 
         for tier, model_id, model_desc in self._models:
@@ -476,7 +502,9 @@ class WelcomeWindow(Adw.Window):
             percentage = int(fraction * 100)
             completed_gb = completed / (1024 * 1024 * 1024)
             total_gb = total / (1024 * 1024 * 1024)
-            self._progress_lbl.set_text(f"Downloading: {percentage}% ({completed_gb:.2f} / {total_gb:.2f} GB)")
+            self._progress_lbl.set_text(
+                f"Downloading: {percentage}% ({completed_gb:.2f} / {total_gb:.2f} GB)"
+            )
         else:
             self._pull_progress.pulse()
             self._progress_lbl.set_text(f"Status: {status}")
@@ -511,17 +539,27 @@ class WelcomeWindow(Adw.Window):
             if shutil.which("ollama") is None:
                 setup = "/usr/local/bin/axon-ollama-setup"
                 if os.path.exists(setup):
-                    GLib.idle_add(self._update_pull_progress, 0, 0,
-                                  "Installing Ollama runtime (a few minutes)...")
+                    GLib.idle_add(
+                        self._update_pull_progress,
+                        0,
+                        0,
+                        "Installing Ollama runtime (a few minutes)...",
+                    )
                     try:
-                        subprocess.run([setup, model],
-                                       stdout=subprocess.DEVNULL,
-                                       stderr=subprocess.DEVNULL,
-                                       check=True)
+                        subprocess.run(
+                            [setup, model],
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL,
+                            check=True,
+                        )
                         GLib.idle_add(self._update_pull_progress, 1, 1, "success")
                     except Exception:
-                        GLib.idle_add(self._update_pull_progress, 0, 0,
-                                      "error: Ollama install failed — check your internet connection")
+                        GLib.idle_add(
+                            self._update_pull_progress,
+                            0,
+                            0,
+                            "error: Ollama install failed — check your internet connection",
+                        )
                     return
 
             if self.brain is None:
@@ -537,13 +575,18 @@ class WelcomeWindow(Adw.Window):
                     GLib.idle_add(self._update_pull_progress, 0, 0, f"Error: {e}")
             else:
                 # Local command fallback if service is missing
-                GLib.idle_add(self._update_pull_progress, 0, 0, "Brain service not available. Retrying via CLI...")
+                GLib.idle_add(
+                    self._update_pull_progress,
+                    0,
+                    0,
+                    "Brain service not available. Retrying via CLI...",
+                )
                 try:
                     subprocess.run(
                         ["ollama", "pull", model],
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL,
-                        check=True
+                        check=True,
                     )
                     GLib.idle_add(self._update_pull_progress, 1, 1, "success")
                 except Exception:
@@ -585,7 +628,7 @@ class WelcomeWindow(Adw.Window):
         shells = [
             ("Bash", "/bin/bash", True),
             ("Zsh", "/usr/bin/zsh", shutil.which("zsh") is not None),
-            ("Fish", "/usr/bin/fish", shutil.which("fish") is not None)
+            ("Fish", "/usr/bin/fish", shutil.which("fish") is not None),
         ]
 
         self.selected_shell = "/bin/bash"
@@ -622,7 +665,9 @@ class WelcomeWindow(Adw.Window):
             lbl_box.append(name_lbl)
 
             if not installed:
-                status_lbl = Gtk.Label(label="Not installed — run 'sudo apt install " + name.lower() + "' to enable")
+                status_lbl = Gtk.Label(
+                    label="Not installed — run 'sudo apt install " + name.lower() + "' to enable"
+                )
                 _add_class(status_lbl, "model-desc")
                 status_lbl.set_halign(Gtk.Align.START)
                 lbl_box.append(status_lbl)
@@ -651,7 +696,7 @@ class WelcomeWindow(Adw.Window):
         self.context_config = {
             "track_clipboard": True,
             "track_terminal_history": True,
-            "track_open_files": True
+            "track_open_files": True,
         }
         ctx_config_path = Path.home() / ".config" / "axon-os" / "context.json"
         if ctx_config_path.exists():
@@ -679,7 +724,9 @@ class WelcomeWindow(Adw.Window):
         self.clip_switch = Gtk.Switch()
         self.clip_switch.set_active(self.context_config["track_clipboard"])
         self.clip_switch.set_valign(Gtk.Align.CENTER)
-        self.clip_switch.connect("state-set", lambda sw, st: self._on_privacy_toggled("track_clipboard", st))
+        self.clip_switch.connect(
+            "state-set", lambda sw, st: self._on_privacy_toggled("track_clipboard", st)
+        )
         clip_row.append(self.clip_switch)
         privacy_box.append(clip_row)
 
@@ -701,7 +748,9 @@ class WelcomeWindow(Adw.Window):
         self.term_switch = Gtk.Switch()
         self.term_switch.set_active(self.context_config["track_terminal_history"])
         self.term_switch.set_valign(Gtk.Align.CENTER)
-        self.term_switch.connect("state-set", lambda sw, st: self._on_privacy_toggled("track_terminal_history", st))
+        self.term_switch.connect(
+            "state-set", lambda sw, st: self._on_privacy_toggled("track_terminal_history", st)
+        )
         term_row.append(self.term_switch)
         privacy_box.append(term_row)
 
@@ -713,7 +762,9 @@ class WelcomeWindow(Adw.Window):
         files_t = Gtk.Label(label="Editor Files Tracking")
         files_t.set_halign(Gtk.Align.START)
         _add_class(files_t, "model-name")
-        files_d = Gtk.Label(label="Provide open file names from editors (VSCode, Vim, nano) to the AI.")
+        files_d = Gtk.Label(
+            label="Provide open file names from editors (VSCode, Vim, nano) to the AI."
+        )
         files_d.set_halign(Gtk.Align.START)
         _add_class(files_d, "model-desc")
         files_lbl_box.append(files_t)
@@ -723,7 +774,9 @@ class WelcomeWindow(Adw.Window):
         self.files_switch = Gtk.Switch()
         self.files_switch.set_active(self.context_config["track_open_files"])
         self.files_switch.set_valign(Gtk.Align.CENTER)
-        self.files_switch.connect("state-set", lambda sw, st: self._on_privacy_toggled("track_open_files", st))
+        self.files_switch.connect(
+            "state-set", lambda sw, st: self._on_privacy_toggled("track_open_files", st)
+        )
         files_row.append(self.files_switch)
         privacy_box.append(files_row)
 
@@ -902,11 +955,15 @@ class WelcomeWindow(Adw.Window):
         links_row.set_halign(Gtk.Align.CENTER)
         links_row.set_margin_top(12)
 
-        doc_btn = Gtk.LinkButton.new_with_label("https://github.com/axonos/axon-os", "Documentation")
+        doc_btn = Gtk.LinkButton.new_with_label(
+            "https://github.com/axonos/axon-os", "Documentation"
+        )
         _add_class(doc_btn, "page-subtitle")
         links_row.append(doc_btn)
 
-        comm_btn = Gtk.LinkButton.new_with_label("https://github.com/axonos/axon-os/discussions", "Community")
+        comm_btn = Gtk.LinkButton.new_with_label(
+            "https://github.com/axonos/axon-os/discussions", "Community"
+        )
         _add_class(comm_btn, "page-subtitle")
         links_row.append(comm_btn)
 

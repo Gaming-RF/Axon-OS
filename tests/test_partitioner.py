@@ -21,4 +21,4 @@ def test_partition_alongside_dry_run_returns_number_or_none():
     p = Partitioner(dry_run=True)
     new_part = p.partition_alongside("/dev/sda", 2, 5)  # shrink by 5GB
     # In dry-run we expect an int (partition index) or None on failure
-    assert (isinstance(new_part, int) or new_part is None)
+    assert isinstance(new_part, int) or new_part is None

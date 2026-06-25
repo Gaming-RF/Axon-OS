@@ -22,7 +22,8 @@ class TestServiceManifest:
         from services.plugin_registry import ServiceManifest
 
         m = tmp_path / "manifest.toml"
-        m.write_text(textwrap.dedent("""\
+        m.write_text(
+            textwrap.dedent("""\
             [service]
             name = "test-svc"
             description = "A test"
@@ -35,7 +36,8 @@ class TestServiceManifest:
             description = "Test Service"
             after = ["axon-brain.service"]
             restart_sec = 5
-        """))
+        """)
+        )
 
         manifest = ServiceManifest.from_toml(m)
         assert manifest.name == "test-svc"
@@ -50,13 +52,15 @@ class TestServiceManifest:
         from services.plugin_registry import ServiceManifest
 
         m = tmp_path / "manifest.toml"
-        m.write_text(textwrap.dedent("""\
+        m.write_text(
+            textwrap.dedent("""\
             [service]
             name = "mini"
             bus_name = "org.axonos.Mini"
             object_path = "/org/axonos/Mini"
             entry_point = "mini.py"
-        """))
+        """)
+        )
 
         manifest = ServiceManifest.from_toml(m)
         assert manifest.name == "mini"
@@ -67,11 +71,13 @@ class TestServiceManifest:
         from services.plugin_registry import ServiceManifest
 
         m = tmp_path / "manifest.toml"
-        m.write_text(textwrap.dedent("""\
+        m.write_text(
+            textwrap.dedent("""\
             [service]
             name = "bad"
             bus_name = "org.axonos.Bad"
-        """))
+        """)
+        )
 
         with pytest.raises(ValueError, match="missing required key"):
             ServiceManifest.from_toml(m)
@@ -89,13 +95,15 @@ class TestServiceRegistry:
         """Helper to create a plugin directory with manifest and entry point."""
         d = tmp_path / name
         d.mkdir()
-        (d / "manifest.toml").write_text(textwrap.dedent(f"""\
+        (d / "manifest.toml").write_text(
+            textwrap.dedent(f"""\
             [service]
             name = "{name}"
             bus_name = "{bus_name}"
             object_path = "/org/axonos/plugins/{name.title()}"
             entry_point = "{entry}"
-        """))
+        """)
+        )
         (d / entry).write_text("# placeholder\n")
         return d
 
@@ -116,13 +124,15 @@ class TestServiceRegistry:
 
         d = tmp_path / "broken"
         d.mkdir()
-        (d / "manifest.toml").write_text(textwrap.dedent("""\
+        (d / "manifest.toml").write_text(
+            textwrap.dedent("""\
             [service]
             name = "broken"
             bus_name = "org.axonos.plugins.Broken"
             object_path = "/org/axonos/plugins/Broken"
             entry_point = "nonexistent.py"
-        """))
+        """)
+        )
 
         registry = ServiceRegistry(plugins_dir=tmp_path)
         manifests = registry.discover()
@@ -133,13 +143,15 @@ class TestServiceRegistry:
 
         d = tmp_path / "evil"
         d.mkdir()
-        (d / "manifest.toml").write_text(textwrap.dedent("""\
+        (d / "manifest.toml").write_text(
+            textwrap.dedent("""\
             [service]
             name = "evil"
             bus_name = "org.axonos.Brain"
             object_path = "/org/axonos/Brain"
             entry_point = "evil.py"
-        """))
+        """)
+        )
         (d / "evil.py").write_text("# placeholder\n")
 
         registry = ServiceRegistry(plugins_dir=tmp_path)
@@ -186,25 +198,29 @@ class TestServiceRegistry:
         # alpha depends on beta
         d = tmp_path / "alpha"
         d.mkdir()
-        (d / "manifest.toml").write_text(textwrap.dedent("""\
+        (d / "manifest.toml").write_text(
+            textwrap.dedent("""\
             [service]
             name = "alpha"
             bus_name = "org.axonos.plugins.Alpha"
             object_path = "/org/axonos/plugins/Alpha"
             entry_point = "svc.py"
             dependencies = ["org.axonos.plugins.Beta"]
-        """))
+        """)
+        )
         (d / "svc.py").write_text("# placeholder\n")
 
         d2 = tmp_path / "beta"
         d2.mkdir()
-        (d2 / "manifest.toml").write_text(textwrap.dedent("""\
+        (d2 / "manifest.toml").write_text(
+            textwrap.dedent("""\
             [service]
             name = "beta"
             bus_name = "org.axonos.plugins.Beta"
             object_path = "/org/axonos/plugins/Beta"
             entry_point = "svc.py"
-        """))
+        """)
+        )
         (d2 / "svc.py").write_text("# placeholder\n")
 
         registry = ServiceRegistry(plugins_dir=tmp_path)

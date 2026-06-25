@@ -15,6 +15,7 @@ PROJECT_ROOT = TESTS_DIR.parent
 BRAIN_SCRIPT = PROJECT_ROOT / "services" / "axon-brain" / "brain_service.py"
 CONTEXT_SCRIPT = PROJECT_ROOT / "services" / "axon-context" / "context_service.py"
 
+
 class TestAxonServices(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -25,14 +26,10 @@ class TestAxonServices(unittest.TestCase):
 
         # Spawn daemons
         cls.brain_proc = subprocess.Popen(
-            [sys.executable, str(BRAIN_SCRIPT)],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
+            [sys.executable, str(BRAIN_SCRIPT)], stdout=subprocess.PIPE, stderr=subprocess.PIPE
         )
         cls.context_proc = subprocess.Popen(
-            [sys.executable, str(CONTEXT_SCRIPT)],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
+            [sys.executable, str(CONTEXT_SCRIPT)], stdout=subprocess.PIPE, stderr=subprocess.PIPE
         )
 
         # Wait for services to register on Session Bus
@@ -69,11 +66,15 @@ class TestAxonServices(unittest.TestCase):
 
     def test_brain_conversations_crud(self):
         # Create
-        conv_id = self.brain.CreateConversation("Test System Prompt", "Test Chat", dbus_interface="org.axonos.Brain")
+        conv_id = self.brain.CreateConversation(
+            "Test System Prompt", "Test Chat", dbus_interface="org.axonos.Brain"
+        )
         self.assertTrue(len(conv_id) > 0)
 
         # Add message
-        success = self.brain.AddMessage(conv_id, "user", "Hello Brain!", dbus_interface="org.axonos.Brain")
+        success = self.brain.AddMessage(
+            conv_id, "user", "Hello Brain!", dbus_interface="org.axonos.Brain"
+        )
         self.assertTrue(success)
 
         # Get messages
@@ -97,7 +98,9 @@ class TestAxonServices(unittest.TestCase):
         self.assertTrue(deleted)
 
     def test_brain_get_embeddings(self):
-        embeddings_json = self.brain.GetEmbeddings("Test embedding query", "", dbus_interface="org.axonos.Brain")
+        embeddings_json = self.brain.GetEmbeddings(
+            "Test embedding query", "", dbus_interface="org.axonos.Brain"
+        )
         data = json.loads(embeddings_json)
         self.assertTrue(isinstance(data, (list, dict)))
 
@@ -106,7 +109,9 @@ class TestAxonServices(unittest.TestCase):
     # ------------------------------------------------------------------
 
     def test_context_window_tracking(self):
-        success = self.context.SetActiveWindow("Visual Studio Code", "code", dbus_interface="org.axonos.Context")
+        success = self.context.SetActiveWindow(
+            "Visual Studio Code", "code", dbus_interface="org.axonos.Context"
+        )
         self.assertTrue(success)
 
         # Query context
@@ -126,12 +131,15 @@ class TestAxonServices(unittest.TestCase):
 
     def test_context_string_formatting(self):
         # Setup window/space for test context
-        self.context.SetActiveWindow("Visual Studio Code", "code", dbus_interface="org.axonos.Context")
+        self.context.SetActiveWindow(
+            "Visual Studio Code", "code", dbus_interface="org.axonos.Context"
+        )
         self.context.SetActiveSpace("Code Space", dbus_interface="org.axonos.Context")
 
         ctx_str = self.context.GetContextString(dbus_interface="org.axonos.Context")
         self.assertIn("Code Space", ctx_str)
         self.assertIn("Visual Studio Code", ctx_str)
+
 
 if __name__ == "__main__":
     unittest.main()

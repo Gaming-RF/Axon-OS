@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 import threading
@@ -177,6 +178,19 @@ _CHIPS: list[tuple[str, str]] = [
 ]
 
 _MAX_HISTORY = 20
+
+# Allowlist of safe characters for AI-generated app names (no paths, no metacharacters)
+_SAFE_APP_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+
+
+def _validate_app_name(name: str) -> str | None:
+    """Return sanitized app name, or None if the name is unsafe."""
+    name = name.strip()
+    if not name or len(name) > 128:
+        return None
+    if not _SAFE_APP_RE.match(name):
+        return None
+    return name
 
 
 # ---------------------------------------------------------------------------
@@ -506,9 +520,10 @@ class IntentBarWindow(Adw.Window):
 
         if action_type == "open_app":
             app_name: str = action.get("app", "")
-            if app_name:
+            safe_name = _validate_app_name(app_name)
+            if safe_name:
                 subprocess.Popen(
-                    [app_name],
+                    [safe_name],
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                 )
@@ -527,9 +542,7 @@ class IntentBarWindow(Adw.Window):
         self._clear_results()
         self._response_label.set_text(f'Searching your files for "{query}"...')
         self._response_label.set_visible(True)
-        threading.Thread(
-            target=self._do_semantic_search, args=(query,), daemon=True
-        ).start()
+        threading.Thread(target=self._do_semantic_search, args=(query,), daemon=True).start()
 
     def _do_semantic_search(self, query: str) -> None:
         results: list[dict[str, Any]] = []
@@ -546,9 +559,7 @@ class IntentBarWindow(Adw.Window):
                 error = str(exc)
         GLib.idle_add(self._show_search_results, query, results, error)
 
-    def _show_search_results(
-        self, query: str, results: list[dict[str, Any]], error: str
-    ) -> bool:
+    def _show_search_results(self, query: str, results: list[dict[str, Any]], error: str) -> bool:
         self._spinner.stop()
         self._clear_results()
         if error:
@@ -560,9 +571,7 @@ class IntentBarWindow(Adw.Window):
 
         backend = results[0].get("backend", "vector")
         label = "semantic" if backend == "vector" else "keyword"
-        self._response_label.set_text(
-            f"Top {len(results)} {label} matches — click to open:"
-        )
+        self._response_label.set_text(f"Top {len(results)} {label} matches — click to open:")
         self._response_label.set_visible(True)
 
         home = GLib.get_home_dir()
@@ -584,17 +593,13 @@ class IntentBarWindow(Adw.Window):
                 snip_lbl.set_ellipsize(Pango.EllipsizeMode.END)
                 inner.append(snip_lbl)
             row_btn.set_child(inner)
-            row_btn.connect(
-                "clicked", lambda _b, p=path: self._open_search_result(p)
-            )
+            row_btn.connect("clicked", lambda _b, p=path: self._open_search_result(p))
             self._results_box.append(row_btn)
         self._results_box.set_visible(True)
         return False
 
     def _open_search_result(self, path: str) -> None:
-        Gio.AppInfo.launch_default_for_uri(
-            GLib.filename_to_uri(path, None), None
-        )
+        Gio.AppInfo.launch_default_for_uri(GLib.filename_to_uri(path, None), None)
         self.close()
 
     def _clear_results(self) -> None:

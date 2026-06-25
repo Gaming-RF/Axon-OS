@@ -57,7 +57,7 @@ class ClipboardStore:
         if not content or not content.strip():
             return False
 
-        content = content[:self.max_entry_len].strip()
+        content = content[: self.max_entry_len].strip()
 
         with self._lock:
             conn = self._get_connection()
@@ -71,17 +71,20 @@ class ClipboardStore:
 
                 conn.execute(
                     "INSERT INTO clipboard_entries (content, content_type, timestamp) VALUES (?, ?, ?)",
-                    (content, content_type, time.time())
+                    (content, content_type, time.time()),
                 )
 
                 # Prune old entries (keep pinned + max_entries most recent)
-                conn.execute("""
+                conn.execute(
+                    """
                     DELETE FROM clipboard_entries WHERE id NOT IN (
                         SELECT id FROM clipboard_entries WHERE pinned = 1
                         UNION
                         SELECT id FROM clipboard_entries ORDER BY id DESC LIMIT ?
                     )
-                """, (self.max_entries,))
+                """,
+                    (self.max_entries,),
+                )
 
                 conn.commit()
                 return True
@@ -96,7 +99,7 @@ class ClipboardStore:
                 rows = conn.execute(
                     "SELECT id, content, content_type, timestamp, pinned "
                     "FROM clipboard_entries ORDER BY id DESC LIMIT ?",
-                    (limit,)
+                    (limit,),
                 ).fetchall()
                 return [dict(row) for row in rows]
             finally:
@@ -104,13 +107,15 @@ class ClipboardStore:
 
     def search(self, query, limit=20):
         """Search clipboard history by content."""
+        # Escape LIKE wildcards to prevent unintended matches
+        safe_query = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         with self._lock:
             conn = self._get_connection()
             try:
                 rows = conn.execute(
                     "SELECT id, content, content_type, timestamp, pinned "
-                    "FROM clipboard_entries WHERE content LIKE ? ORDER BY id DESC LIMIT ?",
-                    (f"%{query}%", limit)
+                    "FROM clipboard_entries WHERE content LIKE ? ESCAPE '\\' ORDER BY id DESC LIMIT ?",
+                    (f"%{safe_query}%", limit),
                 ).fetchall()
                 return [dict(row) for row in rows]
             finally:
@@ -121,10 +126,7 @@ class ClipboardStore:
         with self._lock:
             conn = self._get_connection()
             try:
-                conn.execute(
-                    "UPDATE clipboard_entries SET pinned = 1 WHERE id = ?",
-                    (entry_id,)
-                )
+                conn.execute("UPDATE clipboard_entries SET pinned = 1 WHERE id = ?", (entry_id,))
                 conn.commit()
             finally:
                 conn.close()
@@ -134,10 +136,7 @@ class ClipboardStore:
         with self._lock:
             conn = self._get_connection()
             try:
-                conn.execute(
-                    "UPDATE clipboard_entries SET pinned = 0 WHERE id = ?",
-                    (entry_id,)
-                )
+                conn.execute("UPDATE clipboard_entries SET pinned = 0 WHERE id = ?", (entry_id,))
                 conn.commit()
             finally:
                 conn.close()
@@ -147,10 +146,7 @@ class ClipboardStore:
         with self._lock:
             conn = self._get_connection()
             try:
-                conn.execute(
-                    "DELETE FROM clipboard_entries WHERE id = ?",
-                    (entry_id,)
-                )
+                conn.execute("DELETE FROM clipboard_entries WHERE id = ?", (entry_id,))
                 conn.commit()
             finally:
                 conn.close()
@@ -178,6 +174,7 @@ class ClipboardStore:
     def to_deque(self, maxlen=None):
         """Export recent entries as a deque (for backward compatibility)."""
         from collections import deque
+
         limit = maxlen or self.max_entries
         entries = self.get_recent(limit)
         return deque([e["content"] for e in entries], maxlen=limit)

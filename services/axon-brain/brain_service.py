@@ -26,9 +26,15 @@ except ImportError:  # running standalone — repo root / installed shim not on 
     except ImportError:
         import logging as _logging
 
-        def configure_app_logger(name, level=_logging.INFO, log_file=None):
+        def configure_app_logger(
+            name: str,
+            level: int = _logging.INFO,
+            log_file: str | None = None,
+            json_output: bool = False,
+        ) -> _logging.Logger:
             _logging.basicConfig(level=level)
             return _logging.getLogger(name)
+
 
 logger = configure_app_logger("axon-brain")
 
@@ -66,6 +72,7 @@ def _sanitize_context(context: str) -> str:
         safe = safe[:_MAX_CONTEXT_LEN]
     return safe
 
+
 class BrainService(dbus.service.Object):
     def __init__(self):
         # Initialise GLib main loop integration with D-Bus
@@ -74,29 +81,30 @@ class BrainService(dbus.service.Object):
 
         # Request name org.axonos.Brain
         try:
-            self.bus_name = dbus.service.BusName('org.axonos.Brain', bus=self.session_bus)
+            self.bus_name = dbus.service.BusName("org.axonos.Brain", bus=self.session_bus)
         except dbus.exceptions.NameExistsException:
             logger.error("org.axonos.Brain service is already running.")
             sys.exit(1)
 
-        dbus.service.Object.__init__(self, self.session_bus, '/org/axonos/Brain')
+        dbus.service.Object.__init__(self, self.session_bus, "/org/axonos/Brain")
 
         # Initialize sub-components
-        self._config_lock = threading.Lock()
+        self._config_lock = threading.RLock()
         self.store = ConversationStore()
         self.load_config()
         logger.info("Axon Brain D-Bus Service registered successfully at /org/axonos/Brain")
 
     def save_config(self):
-        """Saves current configuration to TOML format."""
+        """Saves current configuration to TOML format atomically."""
         with self._config_lock:
             try:
                 content = "# Axon OS AI Configuration\n\n"
                 for k, v in self.config.items():
-                    # Escape any backslashes or quotes
                     escaped_v = str(v).replace("\\", "\\\\").replace('"', '\\"')
                     content += f'{k} = "{escaped_v}"\n'
-                CONFIG_FILE.write_text(content)
+                tmp_path = CONFIG_FILE.with_suffix(".tmp")
+                tmp_path.write_text(content)
+                tmp_path.replace(CONFIG_FILE)
             except Exception as e:
                 logger.exception("Error saving config to %s: %s", CONFIG_FILE, e)
 
@@ -109,7 +117,9 @@ class BrainService(dbus.service.Object):
                     with open(CONFIG_FILE, "rb") as f:
                         self.config = tomllib.load(f)
                     # Verify required keys exist
-                    if all(k in self.config for k in ("speed_model", "general_model", "deep_model")):
+                    if all(
+                        k in self.config for k in ("speed_model", "general_model", "deep_model")
+                    ):
                         return
                 except Exception as e:
                     logger.debug("Config file not loaded, using defaults: %s", e)
@@ -119,18 +129,14 @@ class BrainService(dbus.service.Object):
             self.config = {
                 "speed_model": profile["recommendations"]["speed"]["model"],
                 "general_model": profile["recommendations"]["general"]["model"],
-                "deep_model": profile["recommendations"]["deep"]["model"]
+                "deep_model": profile["recommendations"]["deep"]["model"],
             }
             self.save_config()
 
     def _http_post(self, url, payload, stream=False, timeout=60.0, max_retries=5):
         """Helper to execute urllib POST requests with retry logic."""
         data = json.dumps(payload).encode()
-        req = urllib.request.Request(
-            url,
-            data=data,
-            headers={"Content-Type": "application/json"}
-        )
+        req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
         max_backoff = 30.0
         for attempt in range(max_retries):
             try:
@@ -138,7 +144,7 @@ class BrainService(dbus.service.Object):
             except (urllib.error.URLError, OSError):
                 if attempt == max_retries - 1:
                     raise
-                backoff = min(2.0 ** attempt, max_backoff)
+                backoff = min(2.0**attempt, max_backoff)
                 time.sleep(backoff)
 
     def _http_get(self, url, timeout=5.0):
@@ -152,7 +158,7 @@ class BrainService(dbus.service.Object):
             except (urllib.error.URLError, OSError):
                 if attempt == max_retries - 1:
                     raise
-                backoff = min(2.0 ** attempt, max_backoff)
+                backoff = min(2.0**attempt, max_backoff)
                 time.sleep(backoff)
 
     # ------------------------------------------------------------------
@@ -185,14 +191,10 @@ class BrainService(dbus.service.Object):
     # D-Bus Methods
     # ------------------------------------------------------------------
 
-    @dbus.service.method('org.axonos.Brain', in_signature='', out_signature='s')
+    @dbus.service.method("org.axonos.Brain", in_signature="", out_signature="s")
     def GetStatus(self):
         """Returns JSON about Ollama and model config status."""
-        status = {
-            "ollama_online": False,
-            "active_models": [],
-            "configured_models": self.config
-        }
+        status = {"ollama_online": False, "active_models": [], "configured_models": self.config}
         try:
             with self._http_get(f"{OLLAMA_BASE_URL}/api/tags", timeout=2.0) as resp:
                 if resp.status == 200:
@@ -203,7 +205,7 @@ class BrainService(dbus.service.Object):
             logger.debug("Could not query Ollama status: %s", e)
         return json.dumps(status)
 
-    @dbus.service.method('org.axonos.Brain', in_signature='', out_signature='s')
+    @dbus.service.method("org.axonos.Brain", in_signature="", out_signature="s")
     def ListModels(self):
         """Returns local pulled models as a JSON array."""
         try:
@@ -215,7 +217,7 @@ class BrainService(dbus.service.Object):
             return json.dumps({"error": str(e)})
         return "[]"
 
-    @dbus.service.method('org.axonos.Brain', in_signature='s', out_signature='b')
+    @dbus.service.method("org.axonos.Brain", in_signature="s", out_signature="b")
     def PullModel(self, model_name):
         """Starts model pull in a background thread."""
         if not self._validate_model_name(str(model_name)):
@@ -224,7 +226,7 @@ class BrainService(dbus.service.Object):
         threading.Thread(target=self._do_pull_model, args=(str(model_name),), daemon=True).start()
         return True
 
-    @dbus.service.method('org.axonos.Brain', in_signature='sssb', out_signature='s')
+    @dbus.service.method("org.axonos.Brain", in_signature="sssb", out_signature="s")
     def Generate(self, prompt, context, model, stream):
         """Unified text generation interface. If streaming, returns a transaction ID."""
         if not self._validate_prompt(str(prompt)):
@@ -236,53 +238,54 @@ class BrainService(dbus.service.Object):
 
         system_prompt = ""
         if context:
-            system_prompt = f"Here is the user's desktop context:\n\n{_sanitize_context(str(context))}"
+            system_prompt = (
+                f"Here is the user's desktop context:\n\n{_sanitize_context(str(context))}"
+            )
 
         if stream:
             tx_id = str(uuid.uuid4())
             threading.Thread(
                 target=self._do_generate_stream,
                 args=(tx_id, prompt, system_prompt, model),
-                daemon=True
+                daemon=True,
             ).start()
             return tx_id
         else:
             return self._do_generate_sync(prompt, system_prompt, model)
 
-    @dbus.service.method('org.axonos.Brain', in_signature='ss', out_signature='s')
+    @dbus.service.method("org.axonos.Brain", in_signature="ss", out_signature="s")
     def CreateConversation(self, system_prompt, title):
         conv_id = self.store.create_conversation(
-            system_prompt=system_prompt if system_prompt else None,
-            title=title if title else None
+            system_prompt=system_prompt if system_prompt else None, title=title if title else None
         )
         return conv_id
 
-    @dbus.service.method('org.axonos.Brain', in_signature='sss', out_signature='b')
+    @dbus.service.method("org.axonos.Brain", in_signature="sss", out_signature="b")
     def AddMessage(self, conversation_id, role, content):
         self.store.add_message(conversation_id, role, content)
         return True
 
-    @dbus.service.method('org.axonos.Brain', in_signature='s', out_signature='s')
+    @dbus.service.method("org.axonos.Brain", in_signature="s", out_signature="s")
     def GetMessages(self, conversation_id):
         messages = self.store.get_messages(conversation_id)
         return json.dumps(messages)
 
-    @dbus.service.method('org.axonos.Brain', in_signature='', out_signature='s')
+    @dbus.service.method("org.axonos.Brain", in_signature="", out_signature="s")
     def ListConversations(self):
         conversations = self.store.list_conversations()
         return json.dumps(conversations)
 
-    @dbus.service.method('org.axonos.Brain', in_signature='s', out_signature='b')
+    @dbus.service.method("org.axonos.Brain", in_signature="s", out_signature="b")
     def DeleteConversation(self, conversation_id):
         self.store.delete_conversation(conversation_id)
         return True
 
-    @dbus.service.method('org.axonos.Brain', in_signature='ss', out_signature='b')
+    @dbus.service.method("org.axonos.Brain", in_signature="ss", out_signature="b")
     def UpdateTitle(self, conversation_id, title):
         self.store.update_title(conversation_id, title)
         return True
 
-    @dbus.service.method('org.axonos.Brain', in_signature='ssssb', out_signature='s')
+    @dbus.service.method("org.axonos.Brain", in_signature="ssssb", out_signature="s")
     def SendMessage(self, conversation_id, message, context, model, stream):
         """Persists user message and streams or blocks assistant reply with ambient context."""
         self.store.add_message(conversation_id, "user", message)
@@ -295,7 +298,7 @@ class BrainService(dbus.service.Object):
             threading.Thread(
                 target=self._do_chat_stream,
                 args=(tx_id, conversation_id, context, model),
-                daemon=True
+                daemon=True,
             ).start()
             return tx_id
         else:
@@ -303,7 +306,7 @@ class BrainService(dbus.service.Object):
             self.store.add_message(conversation_id, "assistant", resp)
             return resp
 
-    @dbus.service.method('org.axonos.Brain', in_signature='ss', out_signature='s')
+    @dbus.service.method("org.axonos.Brain", in_signature="ss", out_signature="s")
     def ClassifyWindow(self, title, wm_class):
         """Classifies a newly opened window title/class into one of the 9 spaces."""
         model = self.config["speed_model"]
@@ -319,13 +322,23 @@ class BrainService(dbus.service.Object):
                 "prompt": prompt,
                 "system": system_prompt,
                 "stream": False,
-                "options": {"temperature": 0.1}
+                "options": {"temperature": 0.1},
             }
             with self._http_post(f"{OLLAMA_BASE_URL}/api/generate", payload, timeout=5.0) as resp:
                 if resp.status == 200:
                     data = json.loads(resp.read().decode())
-                    result = data.get("response", "").strip().replace('"', '').replace("'", "")
-                    valid_spaces = ["Code", "Web", "Chat", "Files", "Media", "Work", "Personal", "Terminal", "Notes"]
+                    result = data.get("response", "").strip().replace('"', "").replace("'", "")
+                    valid_spaces = [
+                        "Code",
+                        "Web",
+                        "Chat",
+                        "Files",
+                        "Media",
+                        "Work",
+                        "Personal",
+                        "Terminal",
+                        "Notes",
+                    ]
                     for s in valid_spaces:
                         if s.lower() in result.lower():
                             return s
@@ -333,7 +346,7 @@ class BrainService(dbus.service.Object):
             logger.debug("Window classification failed: %s", e)
         return "Default"
 
-    @dbus.service.method('org.axonos.Brain', in_signature='s', out_signature='s')
+    @dbus.service.method("org.axonos.Brain", in_signature="s", out_signature="s")
     def ClassifyIntent(self, text):
         """Spotlight-style classification of workspace intents using the Speed model."""
         model = self.config["speed_model"]
@@ -350,35 +363,48 @@ class BrainService(dbus.service.Object):
                 "prompt": text,
                 "system": system_prompt,
                 "stream": False,
-                "options": {"temperature": 0.1}
+                "options": {"temperature": 0.1},
             }
             with self._http_post(f"{OLLAMA_BASE_URL}/api/generate", payload, timeout=10.0) as resp:
                 if resp.status == 200:
                     result_data = json.loads(resp.read().decode())
                     result = result_data.get("response", "").strip()
 
-                    if result.startswith('{'):
+                    if result.startswith("{"):
                         try:
                             parsed = json.loads(result)
-                            if isinstance(parsed, dict) and parsed.get('action') == 'run_command' and isinstance(parsed.get('command'), str):
-                                return json.dumps({
-                                    'action': 'run_command',
-                                    'command': parsed['command'],
-                                })
-                            if isinstance(parsed, dict) and parsed.get('action') == 'open_app' and isinstance(parsed.get('app'), str):
-                                return json.dumps({
-                                    'action': 'open_app',
-                                    'app': parsed['app'],
-                                })
+                            if (
+                                isinstance(parsed, dict)
+                                and parsed.get("action") == "run_command"
+                                and isinstance(parsed.get("command"), str)
+                            ):
+                                return json.dumps(
+                                    {
+                                        "action": "run_command",
+                                        "command": parsed["command"],
+                                    }
+                                )
+                            if (
+                                isinstance(parsed, dict)
+                                and parsed.get("action") == "open_app"
+                                and isinstance(parsed.get("app"), str)
+                            ):
+                                return json.dumps(
+                                    {
+                                        "action": "open_app",
+                                        "app": parsed["app"],
+                                    }
+                                )
                         except json.JSONDecodeError:
                             pass
                         return text
                     return result
         except Exception as e:
-            return f"[Error: {e}]"
+            logger.debug("ClassifyIntent failed: %s", e)
+            return '{"action": "error", "message": "AI classification unavailable"}'
         return text
 
-    @dbus.service.method('org.axonos.Brain', in_signature='ss', out_signature='s')
+    @dbus.service.method("org.axonos.Brain", in_signature="ss", out_signature="s")
     def GetEmbeddings(self, prompt, model):
         """Generates embedding vector for a given prompt using Ollama."""
         if not model:
@@ -390,7 +416,9 @@ class BrainService(dbus.service.Object):
             try:
                 # Keep retries low: a blocking D-Bus call times out after ~25s,
                 # and the /api/embeddings fallback below still needs to run.
-                with self._http_post(f"{OLLAMA_BASE_URL}/api/embed", payload, timeout=15.0, max_retries=2) as resp:
+                with self._http_post(
+                    f"{OLLAMA_BASE_URL}/api/embed", payload, timeout=15.0, max_retries=2
+                ) as resp:
                     if resp.status == 200:
                         data = json.loads(resp.read().decode())
                         embeddings = data.get("embeddings", [])
@@ -401,7 +429,9 @@ class BrainService(dbus.service.Object):
 
             # Fallback to /api/embeddings
             payload = {"model": model, "prompt": prompt}
-            with self._http_post(f"{OLLAMA_BASE_URL}/api/embeddings", payload, timeout=15.0, max_retries=2) as resp:
+            with self._http_post(
+                f"{OLLAMA_BASE_URL}/api/embeddings", payload, timeout=15.0, max_retries=2
+            ) as resp:
                 if resp.status == 200:
                     data = json.loads(resp.read().decode())
                     return json.dumps(data.get("embedding", []))
@@ -413,17 +443,17 @@ class BrainService(dbus.service.Object):
     # D-Bus Signals
     # ------------------------------------------------------------------
 
-    @dbus.service.signal('org.axonos.Brain', signature='ss')
+    @dbus.service.signal("org.axonos.Brain", signature="ss")
     def TokenGenerated(self, transaction_id, token):
         """Fires when a stream chunk is generated."""
         pass
 
-    @dbus.service.signal('org.axonos.Brain', signature='sbs')
+    @dbus.service.signal("org.axonos.Brain", signature="sbs")
     def GenerationCompleted(self, transaction_id, success, error_msg):
         """Fires when stream finishes."""
         pass
 
-    @dbus.service.signal('org.axonos.Brain', signature='sxxs')
+    @dbus.service.signal("org.axonos.Brain", signature="sxxs")
     def PullProgress(self, model_name, completed_bytes, total_bytes, status):
         """Fires during model downloading updates."""
         pass
@@ -457,7 +487,8 @@ class BrainService(dbus.service.Object):
                 data = json.loads(resp.read().decode())
                 return _sanitize_output(data.get("response", ""))
         except Exception as e:
-            return f"[Error: {e}]"
+            logger.debug("Generate failed: %s", e)
+            return "[Error: AI generation unavailable]"
 
     def _do_generate_stream(self, tx_id, prompt, system, model):
         try:
@@ -488,13 +519,14 @@ class BrainService(dbus.service.Object):
                 "model": model,
                 "messages": api_msgs,
                 "stream": False,
-                "system": system_prompt
+                "system": system_prompt,
             }
             with self._http_post(f"{OLLAMA_BASE_URL}/api/chat", payload) as resp:
                 data = json.loads(resp.read().decode())
                 return _sanitize_output(data.get("message", {}).get("content", ""))
         except Exception as e:
-            return f"[Error: {e}]"
+            logger.debug("Chat failed: %s", e)
+            return "[Error: AI chat unavailable]"
 
     def _do_chat_stream(self, tx_id, conv_id, context, model):
         messages = self.store.get_messages(conv_id)
@@ -509,7 +541,7 @@ class BrainService(dbus.service.Object):
                 "model": model,
                 "messages": api_msgs,
                 "stream": True,
-                "system": system_prompt
+                "system": system_prompt,
             }
             with self._http_post(f"{OLLAMA_BASE_URL}/api/chat", payload) as r:
                 for raw_line in r:
@@ -528,7 +560,8 @@ class BrainService(dbus.service.Object):
         except Exception as e:
             self.GenerationCompleted(tx_id, False, str(e))
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     # Start loop
     loop = GLib.MainLoop()
     service = BrainService()

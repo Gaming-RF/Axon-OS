@@ -28,9 +28,7 @@ class GlobalSearchService(dbus.service.Object):
         dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
         self.session_bus = dbus.SessionBus()
         try:
-            self.bus_name = dbus.service.BusName(
-                "org.axonos.GlobalSearch", bus=self.session_bus
-            )
+            self.bus_name = dbus.service.BusName("org.axonos.GlobalSearch", bus=self.session_bus)
         except dbus.exceptions.NameExistsException:
             log.error("org.axonos.GlobalSearch service is already running.")
             sys.exit(1)
@@ -97,13 +95,15 @@ class GlobalSearchService(dbus.service.Object):
                     items = json.loads(raw) if raw else []
                     for item in items:
                         with results_lock:
-                            results.append({
-                                "type": "file",
-                                "title": item.get("path", "").split("/")[-1],
-                                "subtitle": item.get("path", ""),
-                                "score": item.get("score", 0),
-                                "source": "search",
-                            })
+                            results.append(
+                                {
+                                    "type": "file",
+                                    "title": item.get("path", "").split("/")[-1],
+                                    "subtitle": item.get("path", ""),
+                                    "score": item.get("score", 0),
+                                    "source": "search",
+                                }
+                            )
                 except Exception:
                     pass
 
@@ -122,32 +122,35 @@ class GlobalSearchService(dbus.service.Object):
                                 break
                         if query.lower() in name.lower() or query.lower() in desktop.stem.lower():
                             with results_lock:
-                                results.append({
-                                    "type": "app",
-                                    "title": name or desktop.stem,
-                                    "subtitle": "Application",
-                                    "score": 0.8,
-                                    "source": "desktop",
-                                })
+                                results.append(
+                                    {
+                                        "type": "app",
+                                        "title": name or desktop.stem,
+                                        "subtitle": "Application",
+                                        "score": 0.8,
+                                        "source": "desktop",
+                                    }
+                                )
             except Exception:
                 pass
 
         def _search_settings():
             try:
                 schemas = subprocess.run(
-                    ["gsettings", "list-schemas"],
-                    capture_output=True, text=True, timeout=3
+                    ["gsettings", "list-schemas"], capture_output=True, text=True, timeout=3
                 )
                 for schema in schemas.stdout.strip().splitlines():
                     if query.lower() in schema.lower():
                         with results_lock:
-                            results.append({
-                                "type": "setting",
-                                "title": schema,
-                                "subtitle": "GNOME Setting",
-                                "score": 0.5,
-                                "source": "gsettings",
-                            })
+                            results.append(
+                                {
+                                    "type": "setting",
+                                    "title": schema,
+                                    "subtitle": "GNOME Setting",
+                                    "score": 0.5,
+                                    "source": "gsettings",
+                                }
+                            )
             except Exception:
                 pass
 

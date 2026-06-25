@@ -196,9 +196,12 @@ class AxonSettingsWindow(Adw.ApplicationWindow):
             GLib.idle_add(self._on_command_completed, res)
 
         import threading
+
         threading.Thread(target=worker, daemon=True).start()
 
     def _on_command_completed(self, result: dict) -> None:
+        if not self.get_realized():
+            return
         self._feedback_card.remove_css_class("loading")
         msg = result.get("message", "Request completed.")
         self._feedback_text.set_text(msg)

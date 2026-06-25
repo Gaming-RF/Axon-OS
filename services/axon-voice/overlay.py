@@ -117,8 +117,7 @@ class VoiceOverlay:
         for i in range(_BAR_COUNT):
             # Two superimposed sines give an organic "speech" wobble.
             amp = (
-                math.sin(self._tick + i * 0.55) * 0.5
-                + math.sin(self._tick * 1.7 + i * 0.23) * 0.5
+                math.sin(self._tick + i * 0.55) * 0.5 + math.sin(self._tick * 1.7 + i * 0.23) * 0.5
             )
             h = max(3.0, abs(amp) * (height * 0.85))
             x = i * (bar_w + gap) + gap

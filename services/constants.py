@@ -3,6 +3,7 @@
 Centralizes hardcoded values that were previously scattered across service files.
 Import from here instead of duplicating magic numbers.
 """
+
 import os
 from pathlib import Path
 

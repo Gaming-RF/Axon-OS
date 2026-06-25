@@ -8,6 +8,7 @@ of recommended models with metadata.
 
 import json
 import os
+import re
 import sys
 import threading
 import time
@@ -30,6 +31,19 @@ import urllib.error
 import urllib.request
 
 CATALOG_FILE = AXON_DIR / "model_catalog.json"
+
+_MODEL_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]*$")
+_MAX_MODEL_NAME_LEN = 256
+
+
+def _validate_model_name(name: str) -> bool:
+    """True if name is a safe Ollama model tag."""
+    if not isinstance(name, str) or not name:
+        return False
+    if len(name) > _MAX_MODEL_NAME_LEN or ".." in name:
+        return False
+    return bool(_MODEL_NAME_RE.match(name))
+
 
 # Curated model catalog with metadata
 DEFAULT_CATALOG = [
@@ -197,7 +211,8 @@ class ModelMarketplaceService(dbus.service.Object):
             return json.dumps(self._catalog)
         q = query.lower()
         results = [
-            m for m in self._catalog
+            m
+            for m in self._catalog
             if q in m["name"].lower()
             or q in m.get("description", "").lower()
             or any(q in tag for tag in m.get("tags", []))
@@ -209,21 +224,28 @@ class ModelMarketplaceService(dbus.service.Object):
         """Return models currently pulled into Ollama."""
         try:
             resp = _http_get(f"{OLLAMA_BASE_URL}/api/tags", timeout=3.0)
-            if resp and resp.status == 200:
-                data = json.loads(resp.read().decode())
-                models = data.get("models", [])
-                enriched = []
-                for m in models:
-                    info = self._find_in_catalog(m["name"])
-                    enriched.append({
-                        "name": m["name"],
-                        "size": m.get("size", 0),
-                        "size_gb": round(m.get("size", 0) / (1024**3), 2),
-                        "modified": m.get("modified_at", ""),
-                        "family": info.get("family", "unknown") if info else "unknown",
-                        "description": info.get("description", "") if info else "",
-                    })
-                return json.dumps(enriched)
+            if resp is None:
+                return "[]"
+            try:
+                if resp.status == 200:
+                    data = json.loads(resp.read().decode())
+                    models = data.get("models", [])
+                    enriched = []
+                    for m in models:
+                        info = self._find_in_catalog(m["name"])
+                        enriched.append(
+                            {
+                                "name": m["name"],
+                                "size": m.get("size", 0),
+                                "size_gb": round(m.get("size", 0) / (1024**3), 2),
+                                "modified": m.get("modified_at", ""),
+                                "family": info.get("family", "unknown") if info else "unknown",
+                                "description": info.get("description", "") if info else "",
+                            }
+                        )
+                    return json.dumps(enriched)
+            finally:
+                resp.close()
         except Exception as e:
             return json.dumps({"error": str(e)})
         return "[]"
@@ -231,7 +253,7 @@ class ModelMarketplaceService(dbus.service.Object):
     @dbus.service.method("org.axonos.ModelMarketplace", in_signature="s", out_signature="b")
     def PullModel(self, model_name):
         """Start downloading a model. Returns True if started."""
-        if not isinstance(model_name, str) or not model_name:
+        if not _validate_model_name(model_name):
             return False
         with self._lock:
             if model_name in self._downloads:
@@ -247,7 +269,7 @@ class ModelMarketplaceService(dbus.service.Object):
     @dbus.service.method("org.axonos.ModelMarketplace", in_signature="s", out_signature="b")
     def DeleteModel(self, model_name):
         """Delete a pulled model from Ollama."""
-        if not isinstance(model_name, str) or not model_name:
+        if not _validate_model_name(model_name):
             return False
         try:
             resp = _http_post(
@@ -263,29 +285,35 @@ class ModelMarketplaceService(dbus.service.Object):
     def GetDiskUsage(self):
         """Return disk usage information for models."""
         try:
-            resp = _http_get(f"{OLLAMA_BASE_URL}/api/tags", timeout=3.0)
             total_bytes = 0
             model_count = 0
-            if resp and resp.status == 200:
-                data = json.loads(resp.read().decode())
-                for m in data.get("models", []):
-                    total_bytes += m.get("size", 0)
-                    model_count += 1
+            resp = _http_get(f"{OLLAMA_BASE_URL}/api/tags", timeout=3.0)
+            if resp is not None:
+                try:
+                    if resp.status == 200:
+                        data = json.loads(resp.read().decode())
+                        for m in data.get("models", []):
+                            total_bytes += m.get("size", 0)
+                            model_count += 1
+                finally:
+                    resp.close()
 
             # Get system disk info
             stat = os.statvfs(str(AXON_DIR)) if AXON_DIR.exists() else None
             disk_total = stat.f_blocks * stat.f_frsize if stat else 0
             disk_free = stat.f_bavail * stat.f_frsize if stat else 0
 
-            return json.dumps({
-                "models_size_gb": round(total_bytes / (1024**3), 2),
-                "model_count": model_count,
-                "disk_total_gb": round(disk_total / (1024**3), 2),
-                "disk_free_gb": round(disk_free / (1024**3), 2),
-                "disk_used_percent": round(
-                    (1 - disk_free / disk_total) * 100, 1
-                ) if disk_total > 0 else 0,
-            })
+            return json.dumps(
+                {
+                    "models_size_gb": round(total_bytes / (1024**3), 2),
+                    "model_count": model_count,
+                    "disk_total_gb": round(disk_total / (1024**3), 2),
+                    "disk_free_gb": round(disk_free / (1024**3), 2),
+                    "disk_used_percent": round((1 - disk_free / disk_total) * 100, 1)
+                    if disk_total > 0
+                    else 0,
+                }
+            )
         except Exception as e:
             return json.dumps({"error": str(e)})
 
@@ -304,7 +332,7 @@ class ModelMarketplaceService(dbus.service.Object):
         recommendations = []
         for model in self._catalog:
             if model["name"] not in installed_names:
-                score = 0
+                score: float = 0.0
                 if model["use_case"] == "speed":
                     score = 0.9
                 elif model["use_case"] == "general":
@@ -366,10 +394,12 @@ class ModelMarketplaceService(dbus.service.Object):
     # Helpers
     # ------------------------------------------------------------------
 
-    def _load_catalog(self) -> list:
+    def _load_catalog(self) -> list[dict]:
         if CATALOG_FILE.exists():
             try:
-                return json.loads(CATALOG_FILE.read_text())
+                result = json.loads(CATALOG_FILE.read_text())
+                if isinstance(result, list):
+                    return result
             except Exception:
                 pass
         self._save_catalog(DEFAULT_CATALOG)

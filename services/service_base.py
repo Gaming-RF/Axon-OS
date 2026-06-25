@@ -29,7 +29,12 @@ except ImportError:
     except ImportError:
         import logging as _logging
 
-        def configure_app_logger(name, level=_logging.INFO, log_file=None):
+        def configure_app_logger(
+            name: str,
+            level: int = _logging.INFO,
+            log_file: str | None = None,
+            json_output: bool = False,
+        ) -> _logging.Logger:
             _logging.basicConfig(level=level)
             return _logging.getLogger(name)
 
@@ -75,9 +80,7 @@ class ServiceBase(dbus.service.Object):
         # --- Service-specific setup ---
         self._setup()
 
-        self.logger.info(
-            "%s registered successfully at %s", self.SERVICE_NAME, self.OBJECT_PATH
-        )
+        self.logger.info("%s registered successfully at %s", self.SERVICE_NAME, self.OBJECT_PATH)
 
     # ------------------------------------------------------------------
     # Abstract interface

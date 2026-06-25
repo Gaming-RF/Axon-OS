@@ -29,6 +29,7 @@ class Severity(Enum):
 @dataclass
 class CommandNode:
     """Represents a parsed shell command."""
+
     name: str
     args: list[str]
     lineno: int
@@ -41,6 +42,7 @@ class CommandNode:
 @dataclass
 class Finding:
     """A security finding from AST analysis."""
+
     line: int
     severity: Severity
     description: str
@@ -52,9 +54,11 @@ class Finding:
 # AST-level threat rules
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class ThreatRule:
     """A rule for matching against parsed command ASTs."""
+
     name: str
     severity: Severity
     description: str
@@ -176,48 +180,61 @@ def _is_persistence_install(node: CommandNode) -> bool:
 
 # Threat rules database
 _THREAT_RULES: list[ThreatRule] = [
-    ThreatRule("dangerous_rm", Severity.HIGH,
-               "Recursively force-deletes / or the home directory",
-               _is_dangerous_rm),
-    ThreatRule("curl_pipe_sh", Severity.HIGH,
-               "Pipes a remote download straight into a shell",
-               _is_curl_pipe_sh),
-    ThreatRule("base64_decode_pipe", Severity.HIGH,
-               "Decodes hidden base64 payload into a shell",
-               _is_base64_decode_pipe),
-    ThreatRule("reverse_shell", Severity.HIGH,
-               "Classic reverse shell one-liner",
-               _is_reverse_shell),
-    ThreatRule("dd_to_disk", Severity.HIGH,
-               "Writes raw data directly to a disk device",
-               _is_dd_to_disk),
-    ThreatRule("cryptominer", Severity.HIGH,
-               "Cryptocurrency miner indicators",
-               _is_cryptominer),
-    ThreatRule("eval_dynamic", Severity.MEDIUM,
-               "eval of dynamically generated code",
-               _is_eval_dynamic),
-    ThreatRule("mkfs", Severity.MEDIUM,
-               "Formats a filesystem",
-               _is_mkfs),
-    ThreatRule("persistence", Severity.MEDIUM,
-               "Installs persistent startup hooks (cron/systemd)",
-               _is_persistence_install),
-    ThreatRule("raw_tcp", Severity.MEDIUM,
-               "Opens raw TCP connections via /dev/tcp (reverse-shell idiom)",
-               _is_raw_tcp),
-    ThreatRule("history_clear", Severity.MEDIUM,
-               "Covers its tracks (clears history / shreds files)",
-               _is_history_clear),
-    ThreatRule("sudo", Severity.LOW,
-               "Requests root privileges",
-               _is_sudo_command),
+    ThreatRule(
+        "dangerous_rm",
+        Severity.HIGH,
+        "Recursively force-deletes / or the home directory",
+        _is_dangerous_rm,
+    ),
+    ThreatRule(
+        "curl_pipe_sh",
+        Severity.HIGH,
+        "Pipes a remote download straight into a shell",
+        _is_curl_pipe_sh,
+    ),
+    ThreatRule(
+        "base64_decode_pipe",
+        Severity.HIGH,
+        "Decodes hidden base64 payload into a shell",
+        _is_base64_decode_pipe,
+    ),
+    ThreatRule(
+        "reverse_shell", Severity.HIGH, "Classic reverse shell one-liner", _is_reverse_shell
+    ),
+    ThreatRule(
+        "dd_to_disk", Severity.HIGH, "Writes raw data directly to a disk device", _is_dd_to_disk
+    ),
+    ThreatRule("cryptominer", Severity.HIGH, "Cryptocurrency miner indicators", _is_cryptominer),
+    ThreatRule(
+        "eval_dynamic", Severity.MEDIUM, "eval of dynamically generated code", _is_eval_dynamic
+    ),
+    ThreatRule("mkfs", Severity.MEDIUM, "Formats a filesystem", _is_mkfs),
+    ThreatRule(
+        "persistence",
+        Severity.MEDIUM,
+        "Installs persistent startup hooks (cron/systemd)",
+        _is_persistence_install,
+    ),
+    ThreatRule(
+        "raw_tcp",
+        Severity.MEDIUM,
+        "Opens raw TCP connections via /dev/tcp (reverse-shell idiom)",
+        _is_raw_tcp,
+    ),
+    ThreatRule(
+        "history_clear",
+        Severity.MEDIUM,
+        "Covers its tracks (clears history / shreds files)",
+        _is_history_clear,
+    ),
+    ThreatRule("sudo", Severity.LOW, "Requests root privileges", _is_sudo_command),
 ]
 
 
 # ---------------------------------------------------------------------------
 # Parser
 # ---------------------------------------------------------------------------
+
 
 def _tokenize_line(line: str) -> list[str]:
     """Safely tokenize a shell command line."""
@@ -272,13 +289,15 @@ def _parse_pipeline(line: str, lineno: int, raw: str) -> CommandNode | None:
                 clean_args.append(cmd_args[i])
                 i += 1
 
-        nodes.append(CommandNode(
-            name=cmd_name,
-            args=clean_args,
-            lineno=lineno,
-            raw=raw.strip(),
-            redirect_to=redirect_to,
-        ))
+        nodes.append(
+            CommandNode(
+                name=cmd_name,
+                args=clean_args,
+                lineno=lineno,
+                raw=raw.strip(),
+                redirect_to=redirect_to,
+            )
+        )
 
     # Link pipeline nodes
     for i in range(len(nodes) - 1):
@@ -320,8 +339,14 @@ def _split_on_pipe(line: str) -> list[str]:
 _OBFUSCATION_PATTERNS = [
     (re.compile(r"\$\{[A-Z]+:(\d+):(\d+)\}"), "Substring extraction obfuscation"),
     (re.compile(r"\$\(printf\s+['\"]\\x[0-9a-f]+"), "Hex escape obfuscation via printf"),
-    (re.compile(r"\\x[0-9a-fA-F]{2}.*\\x[0-9a-fA-F]{2}.*\\x[0-9a-fA-F]{2}"), "Multiple hex escapes (obfuscation attempt)"),
-    (re.compile(r"\$\(echo\s+[A-Za-z0-9+/=]{20,}\s*\|\s*base64\s+-d\)"), "Base64 encoded command injection"),
+    (
+        re.compile(r"\\x[0-9a-fA-F]{2}.*\\x[0-9a-fA-F]{2}.*\\x[0-9a-fA-F]{2}"),
+        "Multiple hex escapes (obfuscation attempt)",
+    ),
+    (
+        re.compile(r"\$\(echo\s+[A-Za-z0-9+/=]{20,}\s*\|\s*base64\s+-d\)"),
+        "Base64 encoded command injection",
+    ),
     (re.compile(r"eval\s+\$\(.*\$\(.*\$\("), "Nested eval/subshell obfuscation"),
     (re.compile(r"\$\{IFS\}"), "IFS manipulation (obfuscation technique)"),
     (re.compile(r"\$'\\x[0-9a-fA-F]+'"), "ANSI-C quoting obfuscation"),
@@ -337,19 +362,22 @@ def _detect_obfuscation(text: str) -> list[Finding]:
             continue
         for pattern, desc in _OBFUSCATION_PATTERNS:
             if pattern.search(line):
-                findings.append(Finding(
-                    line=lineno,
-                    severity=Severity.HIGH,
-                    description=f"Obfuscation detected: {desc}",
-                    snippet=stripped[:160],
-                    source="ast",
-                ))
+                findings.append(
+                    Finding(
+                        line=lineno,
+                        severity=Severity.HIGH,
+                        description=f"Obfuscation detected: {desc}",
+                        snippet=stripped[:160],
+                        source="ast",
+                    )
+                )
     return findings
 
 
 # ---------------------------------------------------------------------------
 # Main analysis
 # ---------------------------------------------------------------------------
+
 
 def analyze_script_ast(text: str) -> list[Finding]:
     """Deep analysis using AST parsing + regex fast-pass.
@@ -367,13 +395,15 @@ def analyze_script_ast(text: str) -> list[Finding]:
         key = (f["line"], f["description"])
         if key not in seen:
             seen.add(key)
-            findings.append(Finding(
-                line=f["line"],
-                severity=Severity(f["severity"]),
-                description=f["description"],
-                snippet=f["snippet"],
-                source="regex",
-            ))
+            findings.append(
+                Finding(
+                    line=f["line"],
+                    severity=Severity(f["severity"]),
+                    description=f["description"],
+                    snippet=f["snippet"],
+                    source="regex",
+                )
+            )
 
     # Phase 2: AST analysis
     for lineno, line in enumerate(text.splitlines(), start=1):
@@ -395,13 +425,15 @@ def analyze_script_ast(text: str) -> list[Finding]:
                         key = (lineno, rule.description)
                         if key not in seen:
                             seen.add(key)
-                            findings.append(Finding(
-                                line=lineno,
-                                severity=rule.severity,
-                                description=rule.description,
-                                snippet=stripped[:160],
-                                source="ast",
-                            ))
+                            findings.append(
+                                Finding(
+                                    line=lineno,
+                                    severity=rule.severity,
+                                    description=rule.description,
+                                    snippet=stripped[:160],
+                                    source="ast",
+                                )
+                            )
                 except Exception:
                     pass  # Don't let rule errors break analysis
             current = current.pipe_next
@@ -429,8 +461,7 @@ def risk_level(findings: list[Finding]) -> str:
 def format_findings(findings: list[Finding], limit: int = 8) -> str:
     """Human-readable bullet list for dialogs and terminal output."""
     lines = [
-        f"• line {f.line} [{f.severity.value.upper()}] {f.description}"
-        for f in findings[:limit]
+        f"• line {f.line} [{f.severity.value.upper()}] {f.description}" for f in findings[:limit]
     ]
     if len(findings) > limit:
         lines.append(f"… and {len(findings) - limit} more findings")
@@ -440,6 +471,7 @@ def format_findings(findings: list[Finding], limit: int = 8) -> str:
 # ---------------------------------------------------------------------------
 # Backward-compatible API (matches audit.py interface)
 # ---------------------------------------------------------------------------
+
 
 def analyze_script_compat(text: str) -> list[dict]:
     """Return findings as dicts for backward compatibility with shield.py."""
@@ -467,8 +499,7 @@ def risk_level_compat(findings: list[dict]) -> str:
 def format_findings_compat(findings: list[dict], limit: int = 8) -> str:
     """Backward-compatible format_findings that accepts dict findings."""
     lines = [
-        f"• line {f['line']} [{f['severity'].upper()}] {f['description']}"
-        for f in findings[:limit]
+        f"• line {f['line']} [{f['severity'].upper()}] {f['description']}" for f in findings[:limit]
     ]
     if len(findings) > limit:
         lines.append(f"… and {len(findings) - limit} more findings")

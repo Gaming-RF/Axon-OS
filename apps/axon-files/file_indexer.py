@@ -16,6 +16,7 @@ from constants import AXON_DIR
 
 try:
     import dbus.mainloop.glib
+
     dbus.mainloop.glib.threads_init()
 except Exception:
     pass
@@ -34,17 +35,20 @@ except ImportError:  # running standalone — repo root / installed shim not on 
             _logging.basicConfig(level=level)
             return _logging.getLogger(name)
 
+
 logger = configure_app_logger(__name__)
+
 
 # Helper to format file size
 def format_size(size_in_bytes):
     if size_in_bytes is None:
         return ""
-    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+    for unit in ["B", "KB", "MB", "GB", "TB"]:
         if size_in_bytes < 1024.0:
-            return f"{size_in_bytes:.1f} {unit}" if unit != 'B' else f"{size_in_bytes} B"
+            return f"{size_in_bytes:.1f} {unit}" if unit != "B" else f"{size_in_bytes} B"
         size_in_bytes /= 1024.0
     return f"{size_in_bytes:.1f} PB"
+
 
 # Helper to format timestamp
 def format_timestamp(timestamp):
@@ -56,6 +60,7 @@ def format_timestamp(timestamp):
     except Exception:
         return ""
 
+
 def cosine_similarity(v1, v2):
     if not v1 or not v2 or len(v1) != len(v2):
         return 0.0
@@ -66,48 +71,64 @@ def cosine_similarity(v1, v2):
         return 0.0
     return dot_product / (magnitude1 * magnitude2)
 
+
 def fetch_embedding_dbus(prompt: str) -> list:
     """Generates embedding vector for a given prompt using Ollama via D-Bus."""
     try:
         bus = dbus.SessionBus()
-        brain_obj = bus.get_object('org.axonos.Brain', '/org/axonos/Brain')
+        brain_obj = bus.get_object("org.axonos.Brain", "/org/axonos/Brain")
         # Call GetEmbeddings(prompt, model)
-        embeddings_json = brain_obj.GetEmbeddings(prompt, "", dbus_interface='org.axonos.Brain')
+        embeddings_json = brain_obj.GetEmbeddings(prompt, "", dbus_interface="org.axonos.Brain")
         embedding = json.loads(embeddings_json)
         if isinstance(embedding, list):
             return embedding
         elif isinstance(embedding, dict) and "error" in embedding:
-            logger.error("D-Bus embedding error: %s", embedding['error'])
+            logger.error("D-Bus embedding error: %s", embedding["error"])
             return []
     except Exception as e:
         logger.exception("Error fetching embedding via D-Bus: %s", e)
     return []
 
+
 def get_all_files(roots):
     """Recursively walks roots and returns list of file paths while excluding heavy folders."""
     all_files = []
     ignored_dirs = {
-        'node_modules', '__pycache__', 'venv', 'env', 'build', 'dist',
-        'target', '.git', '.cache', '.axon', '.gemini', '.local', 'tmp',
-        'flatpak', 'snap', 'cache'
+        "node_modules",
+        "__pycache__",
+        "venv",
+        "env",
+        "build",
+        "dist",
+        "target",
+        ".git",
+        ".cache",
+        ".axon",
+        ".gemini",
+        ".local",
+        "tmp",
+        "flatpak",
+        "snap",
+        "cache",
     }
     for root in roots:
         root_path = Path(root).expanduser().resolve()
         if not root_path.exists():
             continue
         if root_path.is_file():
-            if not root_path.name.startswith('.'):
+            if not root_path.name.startswith("."):
                 all_files.append(root_path)
             continue
 
         for dirpath, dirnames, filenames in os.walk(root_path):
             # Prune ignored directories in place
-            dirnames[:] = [d for d in dirnames if d not in ignored_dirs and not d.startswith('.')]
+            dirnames[:] = [d for d in dirnames if d not in ignored_dirs and not d.startswith(".")]
             for f in filenames:
-                if f.startswith('.'):
+                if f.startswith("."):
                     continue
                 all_files.append(Path(dirpath) / f)
     return all_files
+
 
 class FileIndexer:
     def __init__(self, db_path=None):
@@ -186,18 +207,39 @@ class FileIndexer:
 
             # Re-index or index new file
             file_name = file_path.name
-            file_type = file_path.suffix.lower().lstrip('.')
+            file_type = file_path.suffix.lower().lstrip(".")
 
             content_summary = ""
             text_extensions = {
-                'txt', 'py', 'md', 'js', 'json', 'csv', 'html', 'css',
-                'rs', 'c', 'cpp', 'h', 'sh', 'xml', 'yaml', 'yml',
-                'ini', 'cfg', 'toml', 'go', 'java', 'ts', 'tsx', 'jsx'
+                "txt",
+                "py",
+                "md",
+                "js",
+                "json",
+                "csv",
+                "html",
+                "css",
+                "rs",
+                "c",
+                "cpp",
+                "h",
+                "sh",
+                "xml",
+                "yaml",
+                "yml",
+                "ini",
+                "cfg",
+                "toml",
+                "go",
+                "java",
+                "ts",
+                "tsx",
+                "jsx",
             }
 
             if file_type in text_extensions:
                 try:
-                    with open(file_path, encoding='utf-8', errors='ignore') as f:
+                    with open(file_path, encoding="utf-8", errors="ignore") as f:
                         content_summary = f.read(2000)
                 except Exception:
                     pass
@@ -210,11 +252,22 @@ class FileIndexer:
             embedding_json = json.dumps(embedding_list) if embedding_list else None
 
             # Save to database
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT OR REPLACE INTO files
                 (file_path, file_name, file_type, file_size, last_modified, content_summary, embedding)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (path_str, file_name, file_type, file_size, last_modified, content_summary, embedding_json))
+            """,
+                (
+                    path_str,
+                    file_name,
+                    file_type,
+                    file_size,
+                    last_modified,
+                    content_summary,
+                    embedding_json,
+                ),
+            )
             conn.commit()
 
             indexed_count += 1
@@ -243,7 +296,9 @@ class FileIndexer:
                     deleted_paths.append(db_path)
 
             if deleted_paths:
-                cursor.executemany("DELETE FROM files WHERE file_path = ?", [(p,) for p in deleted_paths])
+                cursor.executemany(
+                    "DELETE FROM files WHERE file_path = ?", [(p,) for p in deleted_paths]
+                )
                 conn.commit()
 
         conn.close()
@@ -254,12 +309,15 @@ class FileIndexer:
             conn = sqlite3.connect(self.db_path, timeout=30.0)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT id, file_path, file_name, file_type, file_size, last_modified, content_summary
                 FROM files
                 ORDER BY last_modified DESC
                 LIMIT ?
-            """, (limit,))
+            """,
+                (limit,),
+            )
             rows = cursor.fetchall()
             conn.close()
             return [dict(row) for row in rows]
@@ -285,43 +343,48 @@ class FileIndexer:
             results = []
             for row in rows:
                 try:
-                    emb_list = json.loads(row['embedding'])
+                    emb_list = json.loads(row["embedding"])
                     if not emb_list:
                         continue
                     sim = cosine_similarity(query_emb, emb_list)
-                    results.append({
-                        'id': row['id'],
-                        'file_path': row['file_path'],
-                        'file_name': row['file_name'],
-                        'file_type': row['file_type'],
-                        'file_size': row['file_size'],
-                        'last_modified': row['last_modified'],
-                        'content_summary': row['content_summary'],
-                        'similarity': sim
-                    })
+                    results.append(
+                        {
+                            "id": row["id"],
+                            "file_path": row["file_path"],
+                            "file_name": row["file_name"],
+                            "file_type": row["file_type"],
+                            "file_size": row["file_size"],
+                            "last_modified": row["last_modified"],
+                            "content_summary": row["content_summary"],
+                            "similarity": sim,
+                        }
+                    )
                 except Exception:
                     pass
 
-            results.sort(key=lambda x: x['similarity'], reverse=True)
+            results.sort(key=lambda x: x["similarity"], reverse=True)
             return results[:limit]
         else:
             conn = sqlite3.connect(self.db_path, timeout=30.0)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             query_like = f"%{query_text}%"
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT id, file_path, file_name, file_type, file_size, last_modified, content_summary
                 FROM files
                 WHERE file_name LIKE ? OR file_path LIKE ? OR content_summary LIKE ?
                 ORDER BY last_modified DESC
                 LIMIT ?
-            """, (query_like, query_like, query_like, limit))
+            """,
+                (query_like, query_like, query_like, limit),
+            )
             rows = cursor.fetchall()
             conn.close()
 
             results = []
             for row in rows:
                 item = dict(row)
-                item['similarity'] = 0.0
+                item["similarity"] = 0.0
                 results.append(item)
             return results

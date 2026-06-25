@@ -81,8 +81,7 @@ def vec_table_ready(db, dim=None):
         return False
     try:
         db.execute(
-            f"CREATE VIRTUAL TABLE IF NOT EXISTS vec_chunks"
-            f" USING vec0(embedding float[{int(dim)}])"
+            f"CREATE VIRTUAL TABLE IF NOT EXISTS vec_chunks USING vec0(embedding float[{int(dim)}])"
         )
         db.execute(
             "INSERT OR REPLACE INTO meta(key, value) VALUES ('vec_dim', ?)",
@@ -182,7 +181,7 @@ class SearchService(dbus.service.Object):
                         return
 
                     paths_to_check = []
-                    if hasattr(event, 'dest_path'):
+                    if hasattr(event, "dest_path"):
                         paths_to_check.append(event.dest_path)
                     if event.src_path:
                         paths_to_check.append(event.src_path)
@@ -191,7 +190,10 @@ class SearchService(dbus.service.Object):
                     for p in paths_to_check:
                         p_path = Path(p)
                         if p_path.suffix.lower() in indexer.INDEX_EXTENSIONS:
-                            if not any(part in indexer.EXCLUDE_DIRS or part.startswith(".") for part in p_path.parts[:-1]):
+                            if not any(
+                                part in indexer.EXCLUDE_DIRS or part.startswith(".")
+                                for part in p_path.parts[:-1]
+                            ):
                                 should_trigger = True
                                 break
 
@@ -321,7 +323,7 @@ class SearchService(dbus.service.Object):
         self._delete_file(db, path)
         for idx, chunk in enumerate(indexer.chunk_text(text)):
             cur = db.execute(
-                "INSERT INTO chunks(path, mtime, chunk_idx, text)" " VALUES (?,?,?,?)",
+                "INSERT INTO chunks(path, mtime, chunk_idx, text) VALUES (?,?,?,?)",
                 (path, mtime, idx, chunk),
             )
             cid = cur.lastrowid

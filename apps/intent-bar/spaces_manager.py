@@ -98,9 +98,7 @@ class SpacesManager:
 
     def get_spaces(self) -> list[Space]:
         """Return all spaces sorted by last_active (most recent first)."""
-        return sorted(
-            self._spaces.values(), key=lambda s: s.last_active, reverse=True
-        )
+        return sorted(self._spaces.values(), key=lambda s: s.last_active, reverse=True)
 
     def get_current_space(self) -> Space | None:
         """Return the currently active space, or None if unset."""

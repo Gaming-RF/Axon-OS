@@ -11,14 +11,15 @@ Pages:
 
 from __future__ import annotations
 
+import re
 import sys
 import threading
 from typing import Any
 
 import gi
 
-gi.require_version("Gtk",  "4.0")
-gi.require_version("Adw",  "1")
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
 
 from gi.repository import Adw, GLib, Gtk
 
@@ -28,12 +29,13 @@ try:
 except ImportError:
     # Allow running standalone for UI prototyping
     Partitioner = None  # type: ignore[assignment,misc]
-    DiskInfo    = None  # type: ignore[assignment,misc]
+    DiskInfo = None  # type: ignore[assignment,misc]
 
 
 # ---------------------------------------------------------------------------
 # Page helpers
 # ---------------------------------------------------------------------------
+
 
 def _label(text: str, **kwargs: Any) -> Gtk.Label:
     lbl = Gtk.Label(label=text, **kwargs)
@@ -52,6 +54,7 @@ def _entry(placeholder: str, secret: bool = False) -> Gtk.Entry:
 # ---------------------------------------------------------------------------
 # Pages
 # ---------------------------------------------------------------------------
+
 
 class WelcomePage(Gtk.Box):
     def __init__(self, on_try: callable, on_install: callable) -> None:
@@ -110,20 +113,21 @@ class UserSetupPage(Gtk.Box):
         self.set_margin_start(64)
         self.set_margin_end(64)
 
-        self.append(_label("<span size='x-large' weight='bold'>Create Your Account</span>",
-                           use_markup=True))
+        self.append(
+            _label("<span size='x-large' weight='bold'>Create Your Account</span>", use_markup=True)
+        )
 
         form = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
 
-        self.username_entry  = _entry("Username")
-        self.password_entry  = _entry("Password", secret=True)
+        self.username_entry = _entry("Username")
+        self.password_entry = _entry("Password", secret=True)
         self.password2_entry = _entry("Confirm password", secret=True)
-        self.hostname_entry  = _entry("Computer name (hostname)")
+        self.hostname_entry = _entry("Computer name (hostname)")
         self.hostname_entry.set_text("axon")
 
-        self.timezone_entry  = _entry("Timezone (e.g. America/New_York)")
+        self.timezone_entry = _entry("Timezone (e.g. America/New_York)")
         self.timezone_entry.set_text("UTC")
-        self.keymap_entry    = _entry("Keyboard layout (e.g. us)")
+        self.keymap_entry = _entry("Keyboard layout (e.g. us)")
         self.keymap_entry.set_text("us")
 
         for widget in (
@@ -141,12 +145,12 @@ class UserSetupPage(Gtk.Box):
     # ------------------------------------------------------------------
     def get_values(self) -> dict[str, str]:
         return {
-            "username":  self.username_entry.get_text(),
-            "password":  self.password_entry.get_text(),
+            "username": self.username_entry.get_text(),
+            "password": self.password_entry.get_text(),
             "password2": self.password2_entry.get_text(),
-            "hostname":  self.hostname_entry.get_text(),
-            "timezone":  self.timezone_entry.get_text(),
-            "keymap":    self.keymap_entry.get_text(),
+            "hostname": self.hostname_entry.get_text(),
+            "timezone": self.timezone_entry.get_text(),
+            "keymap": self.keymap_entry.get_text(),
         }
 
     def validate(self) -> str | None:
@@ -154,12 +158,20 @@ class UserSetupPage(Gtk.Box):
         v = self.get_values()
         if not v["username"]:
             return "Username cannot be empty."
+        if not re.match(r"^[a-z][a-z0-9-]{0,31}$", v["username"]):
+            return "Username must be lowercase, start with a letter, and contain only a-z, 0-9, or hyphens (max 32 chars)."
         if not v["password"]:
             return "Password cannot be empty."
         if v["password"] != v["password2"]:
             return "Passwords do not match."
         if not v["hostname"]:
             return "Hostname cannot be empty."
+        if not re.match(r"^[a-zA-Z0-9]([a-zA-Z0-9.-]{0,61}[a-zA-Z0-9])?$", v["hostname"]):
+            return "Hostname must be a valid RFC 1123 name (letters, digits, hyphens, dots)."
+        if v["timezone"] and not re.match(r"^[A-Za-z0-9_/-]+$", v["timezone"]):
+            return "Timezone must contain only letters, digits, underscores, hyphens, and slashes."
+        if v["keymap"] and not re.match(r"^[A-Za-z0-9_-]+$", v["keymap"]):
+            return "Keymap must contain only letters, digits, underscores, and hyphens."
         return None
 
 
@@ -199,8 +211,12 @@ class DiskPage(Gtk.Box):
         self.set_margin_start(48)
         self.set_margin_end(48)
 
-        self.append(_label("<span size='x-large' weight='bold'>Choose Installation Disk</span>",
-                           use_markup=True))
+        self.append(
+            _label(
+                "<span size='x-large' weight='bold'>Choose Installation Disk</span>",
+                use_markup=True,
+            )
+        )
 
         scroll = Gtk.ScrolledWindow()
         scroll.set_size_request(-1, 120)
@@ -224,7 +240,9 @@ class DiskPage(Gtk.Box):
         self.erase_radio.connect("toggled", self._on_type_toggled)
         self.append(self.erase_radio)
 
-        self.alongside_radio = Gtk.CheckButton(label="Install alongside existing operating system (Dual Boot)")
+        self.alongside_radio = Gtk.CheckButton(
+            label="Install alongside existing operating system (Dual Boot)"
+        )
         self.alongside_radio.set_group(self.erase_radio)
         self.append(self.alongside_radio)
 
@@ -313,15 +331,9 @@ class DiskPage(Gtk.Box):
             part_num_str = self.part_combo.get_active_id()
             part_num = int(part_num_str) if part_num_str else None
             shrink_val = int(self.shrink_slider.get_value())
-            return {
-                "mode": "alongside",
-                "partition_num": part_num,
-                "shrink_size_gb": shrink_val
-            }
+            return {"mode": "alongside", "partition_num": part_num, "shrink_size_gb": shrink_val}
         else:
-            return {
-                "mode": "erase"
-            }
+            return {"mode": "erase"}
 
 
 class ProgressPage(Gtk.Box):
@@ -334,8 +346,9 @@ class ProgressPage(Gtk.Box):
         self.set_margin_start(64)
         self.set_margin_end(64)
 
-        self.append(_label("<span size='x-large' weight='bold'>Installing Axon OS…</span>",
-                           use_markup=True))
+        self.append(
+            _label("<span size='x-large' weight='bold'>Installing Axon OS…</span>", use_markup=True)
+        )
 
         self.progress_bar = Gtk.ProgressBar()
         self.progress_bar.set_show_text(True)
@@ -356,9 +369,9 @@ class ProgressPage(Gtk.Box):
 # Main application window
 # ---------------------------------------------------------------------------
 
-PAGE_WELCOME  = "welcome"
-PAGE_USER     = "user"
-PAGE_DISK     = "disk"
+PAGE_WELCOME = "welcome"
+PAGE_USER = "user"
+PAGE_DISK = "disk"
 PAGE_PROGRESS = "progress"
 
 PAGE_ORDER = [PAGE_WELCOME, PAGE_USER, PAGE_DISK, PAGE_PROGRESS]
@@ -371,21 +384,20 @@ class InstallerApp(Adw.ApplicationWindow):
         self.set_resizable(False)
 
         # Pages
-        self._welcome_page  = WelcomePage(
-            on_try=self._on_try_clicked,
-            on_install=self._on_install_clicked
+        self._welcome_page = WelcomePage(
+            on_try=self._on_try_clicked, on_install=self._on_install_clicked
         )
-        self._user_page     = UserSetupPage()
-        self._disk_page     = DiskPage()
+        self._user_page = UserSetupPage()
+        self._disk_page = DiskPage()
         self._progress_page = ProgressPage()
 
         # Stack
         self._stack = Gtk.Stack()
         self._stack.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT)
         self._stack.set_transition_duration(300)
-        self._stack.add_named(self._welcome_page,  PAGE_WELCOME)
-        self._stack.add_named(self._user_page,     PAGE_USER)
-        self._stack.add_named(self._disk_page,     PAGE_DISK)
+        self._stack.add_named(self._welcome_page, PAGE_WELCOME)
+        self._stack.add_named(self._user_page, PAGE_USER)
+        self._stack.add_named(self._disk_page, PAGE_DISK)
         self._stack.add_named(self._progress_page, PAGE_PROGRESS)
 
         # Navigation buttons
@@ -404,7 +416,7 @@ class InstallerApp(Adw.ApplicationWindow):
         btn_box.append(self._back_btn)
         btn_box.append(self._next_btn)
 
-        self.btn_box = btn_box # Store reference
+        self.btn_box = btn_box  # Store reference
 
         root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         root.append(self._stack)
@@ -426,7 +438,7 @@ class InstallerApp(Adw.ApplicationWindow):
             self.btn_box.set_visible(False)
         else:
             self.btn_box.set_visible(True)
-            self._back_btn.set_sensitive(self._current_index > 1) # Block backing into Welcome page
+            self._back_btn.set_sensitive(self._current_index > 1)  # Block backing into Welcome page
 
             if page_name == PAGE_DISK:
                 self._next_btn.set_label("Install")
@@ -440,6 +452,7 @@ class InstallerApp(Adw.ApplicationWindow):
 
     def _on_try_clicked(self) -> None:
         from axon_logger import configure_app_logger
+
         logger = configure_app_logger(__name__)
         logger.info("Live Preview Mode triggered.")
         self.get_application().quit()
@@ -486,6 +499,7 @@ class InstallerApp(Adw.ApplicationWindow):
                 return
 
             if disk_settings["mode"] == "erase":
+
                 def on_confirm_response(dialog, response):
                     if response == "install":
                         self._current_index += 1
@@ -517,7 +531,7 @@ class InstallerApp(Adw.ApplicationWindow):
 
     def _start_install(self) -> None:
         user_info = self._user_page.get_values()
-        disk      = self._disk_page.get_selected_disk()
+        disk = self._disk_page.get_selected_disk()
         disk_settings = self._disk_page.get_installation_settings()
 
         thread = threading.Thread(
@@ -539,26 +553,45 @@ class InstallerApp(Adw.ApplicationWindow):
     ) -> None:
         try:
             if Partitioner is None:
+
                 class MockPartitioner:
                     def __init__(self, dry_run=True):
                         self.dry_run = True
-                    def list_disks(self): return []
-                    def get_partition_map(self, dev): return []
-                    def partition_disk(self, dev, mode): return True
-                    def partition_alongside(self, dev, pnum, sz): return 3
-                    def format_partitions(self, dev): pass
-                    def format_partitions_alongside(self, dev, rnum): pass
-                    def mount_partitions(self, dev, mnt): pass
-                    def mount_partitions_alongside(self, dev, enum, rnum, mnt): pass
+
+                    def list_disks(self):
+                        return []
+
+                    def get_partition_map(self, dev):
+                        return []
+
+                    def partition_disk(self, dev, mode):
+                        return True
+
+                    def partition_alongside(self, dev, pnum, sz):
+                        return 3
+
+                    def format_partitions(self, dev):
+                        pass
+
+                    def format_partitions_alongside(self, dev, rnum):
+                        pass
+
+                    def mount_partitions(self, dev, mnt):
+                        pass
+
+                    def mount_partitions_alongside(self, dev, enum, rnum, mnt):
+                        pass
+
                 part = MockPartitioner()
             else:
                 part = Partitioner(dry_run=False)
 
             device = disk.device if disk else "/dev/sda"
-            mount  = "/mnt/axon"
-            mode   = disk_settings["mode"]
+            mount = "/mnt/axon"
+            mode = disk_settings["mode"]
 
             import os
+
             os.makedirs(mount, exist_ok=True)
 
             if mode == "erase":
@@ -596,7 +629,11 @@ class InstallerApp(Adw.ApplicationWindow):
                         break
                 part.mount_partitions_alongside(device, efi_num, new_root_num, mount)
 
-                root_device = f"{device}p{new_root_num}" if device[-1].isdigit() else f"{device}{new_root_num}"
+                root_device = (
+                    f"{device}p{new_root_num}"
+                    if device[-1].isdigit()
+                    else f"{device}{new_root_num}"
+                )
                 efi_device = f"{device}p{efi_num}" if device[-1].isdigit() else f"{device}{efi_num}"
 
             import os
@@ -604,7 +641,12 @@ class InstallerApp(Adw.ApplicationWindow):
 
             def get_uuid(dev_path):
                 try:
-                    res = subprocess.run(["blkid", "-o", "value", "-s", "UUID", dev_path], capture_output=True, text=True, check=True)
+                    res = subprocess.run(
+                        ["blkid", "-o", "value", "-s", "UUID", dev_path],
+                        capture_output=True,
+                        text=True,
+                        check=True,
+                    )
                     return res.stdout.strip()
                 except Exception:
                     return None
@@ -615,13 +657,25 @@ class InstallerApp(Adw.ApplicationWindow):
                 if os.path.exists("/rofs"):
                     subprocess.run(["rsync", "-aHAXS", "/rofs/", mount + "/"], check=True)
                 else:
-                    subprocess.run([
-                        "rsync", "-aHAXS",
-                        "--exclude=/proc/*", "--exclude=/sys/*", "--exclude=/dev/*",
-                        "--exclude=/run/*", "--exclude=/tmp/*", "--exclude=/mnt/*",
-                        "--exclude=/media/*", "--exclude=/lost+found", "--exclude=/cdrom/*",
-                        "/", mount + "/"
-                    ], check=True)
+                    subprocess.run(
+                        [
+                            "rsync",
+                            "-aHAXS",
+                            "--exclude=/proc/*",
+                            "--exclude=/sys/*",
+                            "--exclude=/dev/*",
+                            "--exclude=/run/*",
+                            "--exclude=/tmp/*",
+                            "--exclude=/mnt/*",
+                            "--exclude=/media/*",
+                            "--exclude=/lost+found",
+                            "--exclude=/cdrom/*",
+                            "--exclude=/boot/*",
+                            "/",
+                            mount + "/",
+                        ],
+                        check=True,
+                    )
 
             self._set_progress(0.75, "Configuring system…")
             if not part.dry_run:
@@ -631,10 +685,14 @@ class InstallerApp(Adw.ApplicationWindow):
                 # Write fstab
                 fstab_content = ""
                 if root_uuid:
-                    fstab_content += f"UUID={root_uuid} / btrfs subvol=@,defaults,noatime,space_cache=v2 0 0\n"
+                    fstab_content += (
+                        f"UUID={root_uuid} / btrfs subvol=@,defaults,noatime,space_cache=v2 0 0\n"
+                    )
                     fstab_content += f"UUID={root_uuid} /home btrfs subvol=@home,defaults,noatime,space_cache=v2 0 0\n"
                 else:
-                    fstab_content += f"{root_device} / btrfs subvol=@,defaults,noatime,space_cache=v2 0 0\n"
+                    fstab_content += (
+                        f"{root_device} / btrfs subvol=@,defaults,noatime,space_cache=v2 0 0\n"
+                    )
                     fstab_content += f"{root_device} /home btrfs subvol=@home,defaults,noatime,space_cache=v2 0 0\n"
                 if efi_uuid:
                     fstab_content += f"UUID={efi_uuid} /boot/efi vfat defaults 0 2\n"
@@ -661,7 +719,17 @@ class InstallerApp(Adw.ApplicationWindow):
                 # Write timezone
                 tz = user_info.get("timezone", "UTC")
                 if tz:
-                    subprocess.run(["chroot", mount, "ln", "-sf", f"/usr/share/zoneinfo/{tz}", "/etc/localtime"], check=False)
+                    subprocess.run(
+                        [
+                            "chroot",
+                            mount,
+                            "ln",
+                            "-sf",
+                            f"/usr/share/zoneinfo/{tz}",
+                            "/etc/localtime",
+                        ],
+                        check=False,
+                    )
 
                 # Write keyboard
                 keymap = user_info.get("keymap", "us")
@@ -674,25 +742,39 @@ class InstallerApp(Adw.ApplicationWindow):
                 # Add rootflags=subvol=@ so the kernel mounts the correct BTRFS subvolume
                 with open(os.path.join(mount, "etc", "default", "grub"), "a") as f:
                     f.write("\nGRUB_DISABLE_OS_PROBER=false\n")
-                    f.write('GRUB_CMDLINE_LINUX_DEFAULT="quiet splash rootflags=subvol=@ console=tty0"\n')
+                    f.write(
+                        'GRUB_CMDLINE_LINUX_DEFAULT="quiet splash rootflags=subvol=@ console=tty0"\n'
+                    )
                     f.write('GRUB_CMDLINE_LINUX=""\n')
 
                 # Create user with password via chpasswd
                 username = user_info["username"]
                 password = user_info["password"]
 
-                subprocess.run(["chroot", mount, "useradd", "-m", "-s", "/bin/bash", username], check=True)
+                subprocess.run(
+                    ["chroot", mount, "useradd", "-m", "-s", "/bin/bash", username], check=True
+                )
 
-                proc = subprocess.Popen(["chroot", mount, "chpasswd"], stdin=subprocess.PIPE, text=True)
+                proc = subprocess.Popen(
+                    ["chroot", mount, "chpasswd"], stdin=subprocess.PIPE, text=True
+                )
                 proc.communicate(f"{username}:{password}\n")
                 if proc.returncode != 0:
                     raise RuntimeError("Failed to set user password.")
 
-                subprocess.run(["chroot", mount, "usermod", "-aG", "sudo,adm,cdrom,dip,plugdev", username], check=True)
-                subprocess.run(["chroot", mount, "chown", "-R", f"{username}:{username}", f"/home/{username}"], check=True)
+                subprocess.run(
+                    ["chroot", mount, "usermod", "-aG", "sudo,adm,cdrom,dip,plugdev", username],
+                    check=True,
+                )
+                subprocess.run(
+                    ["chroot", mount, "chown", "-R", f"{username}:{username}", f"/home/{username}"],
+                    check=True,
+                )
 
                 # Remove installer shortcut from new user desktop
-                installer_desktop = os.path.join(mount, "home", username, "Desktop", "install-axon-os.desktop")
+                installer_desktop = os.path.join(
+                    mount, "home", username, "Desktop", "install-axon-os.desktop"
+                )
                 if os.path.exists(installer_desktop):
                     os.remove(installer_desktop)
 
@@ -708,7 +790,9 @@ class InstallerApp(Adw.ApplicationWindow):
             if not part.dry_run:
                 # Mount bind virtual filesystems
                 subprocess.run(["mount", "--bind", "/dev", os.path.join(mount, "dev")], check=True)
-                subprocess.run(["mount", "--bind", "/proc", os.path.join(mount, "proc")], check=True)
+                subprocess.run(
+                    ["mount", "--bind", "/proc", os.path.join(mount, "proc")], check=True
+                )
                 subprocess.run(["mount", "--bind", "/sys", os.path.join(mount, "sys")], check=True)
                 subprocess.run(["mount", "--bind", "/run", os.path.join(mount, "run")], check=True)
 
@@ -720,11 +804,18 @@ class InstallerApp(Adw.ApplicationWindow):
 
                 try:
                     # Install grub
-                    subprocess.run([
-                        "chroot", mount, "grub-install",
-                        "--target=x86_64-efi", "--efi-directory=/boot/efi",
-                        "--bootloader-id=Axon OS", "--recheck"
-                    ], check=True)
+                    subprocess.run(
+                        [
+                            "chroot",
+                            mount,
+                            "grub-install",
+                            "--target=x86_64-efi",
+                            "--efi-directory=/boot/efi",
+                            "--bootloader-id=Axon OS",
+                            "--recheck",
+                        ],
+                        check=True,
+                    )
 
                     # Update grub
                     subprocess.run(["chroot", mount, "update-grub"], check=True)
@@ -743,12 +834,22 @@ class InstallerApp(Adw.ApplicationWindow):
         except Exception as exc:
             GLib.idle_add(self._show_error_dialog, str(exc))
         finally:
-            # Clean up target mounts safely
-            try:
-                subprocess.run(["umount", "-l", os.path.join(mount, "boot/efi")], check=False, capture_output=True)
-                subprocess.run(["umount", "-l", mount], check=False, capture_output=True)
-            except Exception:
-                pass
+            # Clean up all mounts safely (order: deepest first)
+            mount_targets = [
+                os.path.join(mount, "sys/firmware/efi/efivars"),
+                os.path.join(mount, "run"),
+                os.path.join(mount, "sys"),
+                os.path.join(mount, "proc"),
+                os.path.join(mount, "dev"),
+                os.path.join(mount, "boot/efi"),
+                os.path.join(mount, "home"),
+                mount,
+            ]
+            for target in mount_targets:
+                try:
+                    subprocess.run(["umount", "-l", target], check=False, capture_output=True)
+                except Exception:
+                    pass
 
     def _show_done_dialog(self) -> None:
         dialog = Adw.MessageDialog(
@@ -773,6 +874,7 @@ class InstallerApp(Adw.ApplicationWindow):
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     app = Adw.Application(application_id="com.axonos.installer")

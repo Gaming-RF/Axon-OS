@@ -55,15 +55,11 @@ class GuiAgentService(dbus.service.Object):
         dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
         self.session_bus = dbus.SessionBus()
         try:
-            self.bus_name = dbus.service.BusName(
-                "org.axonos.GuiAgent", bus=self.session_bus
-            )
+            self.bus_name = dbus.service.BusName("org.axonos.GuiAgent", bus=self.session_bus)
         except dbus.exceptions.NameExistsException:
             log.error("org.axonos.GuiAgent service is already running.")
             sys.exit(1)
-        dbus.service.Object.__init__(
-            self, self.session_bus, "/org/axonos/GuiAgent"
-        )
+        dbus.service.Object.__init__(self, self.session_bus, "/org/axonos/GuiAgent")
         log.info("Axon GUI Agent registered at /org/axonos/GuiAgent")
 
     # ------------------------------------------------------------------
@@ -98,15 +94,18 @@ class GuiAgentService(dbus.service.Object):
     def _run(self, instruction):
         raw = self._ask_brain(instruction)
         if raw is None:
-            return {"ok": False, "error": "AI brain unavailable",
-                    "executed": [], "skipped": []}
+            return {"ok": False, "error": "AI brain unavailable", "executed": [], "skipped": []}
         ops, errors = plan_mod.validate_plan(raw)
         executed, failed = [], []
         for op in ops:
             ok, detail = self._apply(op)
             (executed if ok else failed).append(detail)
-        report = {"ok": bool(executed) and not failed,
-                  "executed": executed, "failed": failed, "skipped": errors}
+        report = {
+            "ok": bool(executed) and not failed,
+            "executed": executed,
+            "failed": failed,
+            "skipped": errors,
+        }
         summary = f"{len(executed)} change(s) applied"
         if failed or errors:
             summary += f", {len(failed) + len(errors)} skipped"
@@ -115,13 +114,9 @@ class GuiAgentService(dbus.service.Object):
 
     def _ask_brain(self, instruction):
         try:
-            obj = self.session_bus.get_object(
-                "org.axonos.Brain", "/org/axonos/Brain"
-            )
+            obj = self.session_bus.get_object("org.axonos.Brain", "/org/axonos/Brain")
             brain = dbus.Interface(obj, "org.axonos.Brain")
-            return str(brain.Generate(
-                PLANNER_PROMPT + instruction, "", "", False, timeout=60
-            ))
+            return str(brain.Generate(PLANNER_PROMPT + instruction, "", "", False, timeout=60))
         except dbus.exceptions.DBusException:
             return None
 
@@ -130,10 +125,14 @@ class GuiAgentService(dbus.service.Object):
         try:
             if op_type == "gsettings_set":
                 value = plan_mod.to_gvariant(op["value"])
+                # Validate value field for dangerous characters
+                if any(c in str(value) for c in ";|&$`\n\\"):
+                    return False, "rejected: suspicious characters in value"
                 proc = subprocess.run(
-                    ["gsettings", "set", str(op["schema"]),
-                     str(op["key"]), value],
-                    capture_output=True, text=True, timeout=10,
+                    ["gsettings", "set", str(op["schema"]), str(op["key"]), value],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
                 )
                 detail = f"gsettings {op['schema']} {op['key']} = {value}"
                 if proc.returncode != 0:
@@ -141,10 +140,8 @@ class GuiAgentService(dbus.service.Object):
                 return True, detail
             if op_type == "launch_app":
                 app = str(op["app"])
-                launcher = (["gtk-launch", app]
-                            if shutil.which("gtk-launch") else [app])
-                subprocess.Popen(launcher, stdout=subprocess.DEVNULL,
-                                 stderr=subprocess.DEVNULL)
+                launcher = ["gtk-launch", app] if shutil.which("gtk-launch") else [app]
+                subprocess.Popen(launcher, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 return True, f"launched {app}"
             if op_type == "notify":
                 self._notify("Axon", str(op["message"]))
@@ -157,7 +154,8 @@ class GuiAgentService(dbus.service.Object):
         if shutil.which("notify-send"):
             subprocess.Popen(
                 ["notify-send", "-i", "preferences-system", title, body[:300]],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
             )
 
 

@@ -12,6 +12,7 @@ from dbus.mainloop.glib import DBusGMainLoop
 
 _ERROR_NOT_RUNNING: str = "[error] Axon Brain service is not reachable."
 
+
 class OllamaClient:
     """Proxy client that forwards calls to the org.axonos.Brain D-Bus service."""
 
@@ -25,7 +26,7 @@ class OllamaClient:
         DBusGMainLoop(set_as_default=True)
         self.bus = dbus.SessionBus()
         try:
-            self.brain = self.bus.get_object('org.axonos.Brain', '/org/axonos/Brain')
+            self.brain = self.bus.get_object("org.axonos.Brain", "/org/axonos/Brain")
         except Exception:
             self.brain = None
 
@@ -37,12 +38,12 @@ class OllamaClient:
         self.bus.add_signal_receiver(
             self._on_token_generated,
             signal_name="TokenGenerated",
-            dbus_interface="org.axonos.Brain"
+            dbus_interface="org.axonos.Brain",
         )
         self.bus.add_signal_receiver(
             self._on_generation_completed,
             signal_name="GenerationCompleted",
-            dbus_interface="org.axonos.Brain"
+            dbus_interface="org.axonos.Brain",
         )
 
     def _on_token_generated(self, transaction_id: str, token: str) -> None:
@@ -58,7 +59,7 @@ class OllamaClient:
     def _get_brain(self) -> Any:
         if self.brain is None:
             try:
-                self.brain = self.bus.get_object('org.axonos.Brain', '/org/axonos/Brain')
+                self.brain = self.bus.get_object("org.axonos.Brain", "/org/axonos/Brain")
             except Exception as e:
                 raise RuntimeError("org.axonos.Brain service is offline or unreachable.") from e
         return self.brain
@@ -132,6 +133,7 @@ class OllamaClient:
             return str(brain.CreateConversation(system_prompt, title))
         except Exception:
             import uuid
+
             return str(uuid.uuid4())
 
     def list_conversations(self) -> list[dict[str, Any]]:
@@ -189,25 +191,36 @@ class OllamaClient:
         prompt = messages[-1].get("content", "") if messages else ""
         return self.generate(prompt, system)
 
-    def chat_stream(
-        self, messages: list[dict[str, Any]], system: str = ""
-    ) -> Iterator[str]:
+    def chat_stream(self, messages: list[dict[str, Any]], system: str = "") -> Iterator[str]:
         """Yield assistant reply tokens for *messages* one by one (streaming)."""
         prompt = messages[-1].get("content", "") if messages else ""
         return self.generate_stream(prompt, system)
-
 
     # ------------------------------------------------------------------
     # Resource management
     # ------------------------------------------------------------------
 
     def close(self) -> None:
-        """Close wrapper."""
-        pass
+        """Unregister D-Bus signal receivers."""
+        try:
+            self.bus.remove_signal_receiver(
+                self._on_token_generated,
+                signal_name="TokenGenerated",
+                dbus_interface="org.axonos.Brain",
+            )
+        except Exception:
+            pass
+        try:
+            self.bus.remove_signal_receiver(
+                self._on_generation_completed,
+                signal_name="GenerationCompleted",
+                dbus_interface="org.axonos.Brain",
+            )
+        except Exception:
+            pass
 
     def __enter__(self) -> OllamaClient:
         return self
 
     def __exit__(self, *_: object) -> None:
         self.close()
-
