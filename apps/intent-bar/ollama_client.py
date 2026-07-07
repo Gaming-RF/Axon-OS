@@ -163,7 +163,7 @@ class OllamaClient:
             pass
 
     def send_message_stream(
-        self, conversation_id: str, message: str, model: str = ""
+        self, conversation_id: str, message: str, model: str = "", ctx: str = ""
     ) -> Iterator[str]:
         """Send a message to a conversation and yield response tokens via D-Bus."""
         try:
@@ -173,7 +173,7 @@ class OllamaClient:
                 self.q.get_nowait()
 
             # Call SendMessage to start stream and get transaction ID
-            self.current_tx = str(brain.SendMessage(conversation_id, message, "", model, True))
+            self.current_tx = str(brain.SendMessage(conversation_id, message, ctx, model, True))
 
             # Consume tokens from queue
             while True:
